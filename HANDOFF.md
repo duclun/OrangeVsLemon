@@ -36,7 +36,7 @@ node tools/shoot.mjs "index.html?t=30" shots/t30.png "GAME.T > 30.5"
 ```
 The harness serves jsdelivr requests from the local `node_modules/three`, because the cloud container blocks jsdelivr.
 
-**Publishing as a claude.ai artifact:** strip `<!doctype>`, `<html>`, `<head>` and `<body>` from `index.html` (the artifact adds its own skeleton), then publish it with `src/*.js` as supporting files.
+**Publishing as a claude.ai artifact:** run `python3 tools/build-artifact.py`. It writes `dist/index.html` (the page minus `<!doctype>`/`<html>`/`<head>`/`<body>`, which the artifact adds) and copies `src/*.js` to `dist/src/`. Publish `dist/index.html` with `dist/src/*.js` as supporting files. `dist/` in git always matches the live artifact; rebuild and commit it whenever you republish.
 
 ## Code map
 | File | What it does |
