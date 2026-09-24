@@ -13,11 +13,11 @@ const yawTo = v => Math.atan2(v.x, v.z);
 
 const LEMON = 0xffd83a, ORANGE = 0xff8a1c;
 const PROPS = {
-  sugar: { name: 'Sugar cube', dmg: 14, stun: 0.8, r: 0.25, col: 0xffffff },
-  bean: { name: 'Coffee bean', dmg: 9, r: 0.2, col: 0x4a2a16 },
-  berry: { name: 'Raspberry', dmg: 11, r: 0.24, col: 0xd8264a, juice: 0xd8264a },
-  ice: { name: 'Ice cube', dmg: 16, slow: 3, r: 0.27, col: 0xcfefff },
-  seed: { name: 'Pip', dmg: 7, r: 0.15, col: 0xf6ecc8 },
+  sugar: { name: 'Sugar cube', dmg: 14, stun: 0.8, r: 0.25, col: 0xffffff, word: 'SUGAR RUSH!' },
+  bean: { name: 'Coffee bean', dmg: 9, r: 0.2, col: 0x4a2a16, word: 'JOLT!' },
+  berry: { name: 'Raspberry', dmg: 11, r: 0.24, col: 0xd8264a, juice: 0xd8264a, word: 'SPLAT!' },
+  ice: { name: 'Ice cube', dmg: 16, slow: 3, r: 0.27, col: 0xcfefff, word: 'BRAIN FREEZE!' },
+  seed: { name: 'Pip', dmg: 7, r: 0.15, col: 0xf6ecc8, word: 'PIP!' },
 };
 
 // v1.5 2D->3D handoff: the act 2 paper drawings become flat cut-out standees in the 3D room, with a white sticker edge.
@@ -216,14 +216,20 @@ export function createGame(world, sound, ui) {
 
   // ---------- combat helpers ----------
   const flatDist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
+  const toScreen = v => { const p = v.clone().project(camera); return { x: (p.x + 1) / 2 * innerWidth, y: (1 - p.y) / 2 * innerHeight, on: p.z < 1 }; };
+  const WORDS = { hit: ['PULP!', 'WHAP!', 'BONK!', 'SQUISH!', 'THUD!'], big: ['ZESTED!', 'SPLOOSH!', 'MEGA PULP!', 'KA-SQUISH!'] };
+  const pick = a => a[Math.floor(Math.random() * a.length)];
+  function popWord(word, at, kind) { const s = toScreen(at); if (s.on) ui.pop(word, s.x, s.y, kind); }
   function hitstop(s) { S.hitstop = Math.max(S.hitstop, s); }
   function shake(s) { S.shake = Math.max(S.shake, s); }
-  function hurtBoss(dmg, point, kind = 'hit') {
+  function hurtBoss(dmg, point, kind = 'hit', word = null) {
     const B = S.boss; if (B.state === 'roar' || B.state === 'dead' || B.state === 'intro') return false;
     if (B.state === 'stunned') dmg = Math.round(dmg * 1.5);
     B.hp = Math.max(0, B.hp - dmg); B.flash = 1; S.player.hits++;
     fx.juice(point, ORANGE, kind === 'heavy' ? 34 : 18, kind === 'heavy' ? 6 : 4.5, 5); fx.spark(point, kind === 'heavy' ? 2.4 : 1.6);
-    sound.sfx(kind === 'heavy' ? 'heavy' : 'hit'); sound.sfx('splash', 0.5); hitstop(kind === 'heavy' ? 0.11 : 0.065); shake(kind === 'heavy' ? 0.45 : 0.2);
+    sound.sfx(kind === 'heavy' ? 'heavy' : 'hit'); sound.sfx('splash', 0.5);
+    const big = kind === 'heavy' || kind === 'finisher' || B.state === 'stunned';
+    popWord(word || pick(big ? WORDS.big : WORDS.hit), point.clone().add(V(0, 0.6, 0)), big ? 'big' : 'hit'); hitstop(kind === 'heavy' ? 0.11 : 0.065); shake(kind === 'heavy' ? 0.45 : 0.2);
     ui.bossBar(B.hp / B.max, B.phase);
     if (B.hp <= 0) { setBoss('dead'); return true; }
     const nextPhase = B.hp / B.max <= 0.33 ? 3 : B.hp / B.max <= 0.66 ? 2 : 1;
@@ -237,6 +243,7 @@ export function createGame(world, sound, ui) {
     const away = V(P.pos.x - from.x, 0, P.pos.z - from.z).normalize(); P.vel.copy(away.multiplyScalar(knock)).setY(5); P.grounded = false;
     if (P.carry) { P.carry.state = 'fly'; P.carry.vel.set(0, 3, 0); P.carry = null; }
     fx.juice(P.pos.clone().add(V(0, 1.2, 0)), LEMON, 22, 4, 4); sound.sfx('hurt'); shake(0.4); hitstop(0.08);
+    popWord(pick(['OOF!', 'OUCH!', 'SOUR!']), P.pos.clone().add(V(0, 2.2, 0)), 'ouch');
     ui.playerBar(P.hp / 100);
     if (P.hp <= 0) { S.mode = 'lost'; S.endT = 0; sound.setMusic('lose'); sound.sfx('slam'); ui.hint(null); }
   }
@@ -325,7 +332,8 @@ export function createGame(world, sound, ui) {
     zest.visible = P.iframes > 0 && !(a?.type === 'dodge') ? Math.floor(S.t * 20) % 2 === 0 : true;
     // hint
     const np = !P.carry && nearestProp();
-    ui.hint(P.carry ? `Throw the ${PROPS[P.carry.type].name.toLowerCase()} (E or click)` : np ? `Grab the ${PROPS[np.type].name.toLowerCase()} (E)` : null);
+    const tgt = P.carry ? P.carry.pos : np?.pos, sc = tgt && toScreen(tgt.clone().add(V(0, 0.7, 0)));
+    ui.hint(sc?.on ? { key: 'E', text: P.carry ? `throw ${PROPS[P.carry.type].name.toLowerCase()}` : `grab ${PROPS[np.type].name.toLowerCase()}`, x: sc.x, y: sc.y } : null);
   }
 
   // ---------- boss AI ----------
@@ -425,7 +433,7 @@ export function createGame(world, sound, ui) {
       else if (p.state === 'fly') {
         p.vel.y -= 22 * dt; p.pos.addScaledVector(p.vel, dt); p.mesh.rotation.x += p.spin.x * dt; p.mesh.rotation.z += p.spin.y * dt;
         if (p.thrown) { const c = B.pos.clone().add(V(0, 1.7, 0)); if (p.pos.distanceTo(c) < 1.35 + def.r) {
-          if (hurtBoss(def.dmg, p.pos.clone(), 'hit')) { if (def.stun && B.state !== 'dead' && B.state !== 'roar') setBoss('stunned'); if (def.slow) B.slow = def.slow;
+          if (hurtBoss(def.dmg, p.pos.clone(), 'hit', def.word)) { if (def.stun && B.state !== 'dead' && B.state !== 'roar') setBoss('stunned'); if (def.slow) B.slow = def.slow;
             if (def.juice) fx.juice(p.pos, def.juice, 14, 4, 3); if (p.type === 'ice' || p.type === 'sugar') fx.juice(p.pos, 0xffffff, 12, 4, 3); }
           p.vel.set(-p.vel.x * 0.25, 4, -p.vel.z * 0.25); p.thrown = false;
           if (p.type === 'berry' || p.type === 'seed') { scene.remove(p.mesh); S.props.splice(i, 1); continue; } } }

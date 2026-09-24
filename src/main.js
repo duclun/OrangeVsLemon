@@ -13,12 +13,22 @@ const ui = {
   bossBar(f) { $('#boss .fill').style.transform = `scaleX(${f})`; $('#boss .lag').style.transform = `scaleX(${f})`; },
   playerBar(f) { $('#me .fill').style.transform = `scaleX(${f})`; $('#me .lag').style.transform = `scaleX(${f})`; },
   banner(h, p = '') { const b = $('#banner .in'); b.querySelector('h2').textContent = h; b.querySelector('p').textContent = p; b.classList.remove('show'); void b.offsetWidth; b.classList.add('show'); },
-  hint(t) { const h = $('#hint'); if (t) h.textContent = t; h.style.opacity = t ? 1 : 0; },
+  // prompt pill that floats over the prop it refers to: h = { key, text, x, y } in CSS pixels, or null to hide
+  hint(h) { const el = $('#hint'); if (!h) { el.style.opacity = 0; return; }
+    const html = `<kbd>${h.key}</kbd>${h.text}`; if (el.dataset.html !== html) { el.dataset.html = html; el.innerHTML = html; }
+    el.style.left = h.x + 'px'; el.style.top = h.y + 'px'; el.style.opacity = 1; },
+  // comic hit word with a starburst at a screen point; kind: 'hit' | 'big' | 'ouch'
+  pop(word, x, y, kind = 'hit') {
+    const box = $('#hits'); if (box.children.length > 6) box.firstChild.remove();
+    const d = document.createElement('div'); d.className = 'hitw ' + kind; d.style.left = x + 'px'; d.style.top = y + 'px';
+    d.style.rotate = (Math.random() * 16 - 8) + 'deg';
+    d.innerHTML = '<div class="burst"></div><div class="burst i"></div><b class="comic"></b>'; d.querySelector('b').textContent = word;
+    box.appendChild(d); setTimeout(() => d.remove(), 800); },
   hud(on) { $('#hud').classList.toggle('on', on); },
   end(won, st) {
     const e = $('#end'); e.style.display = 'grid';
-    e.querySelector('h2').textContent = won ? 'K.O.!' : 'SQUEEZED!';
-    e.querySelector('h2').style.color = won ? 'var(--lemon)' : 'var(--orange)';
+    const h = e.querySelector('h2'); h.textContent = won ? 'K.O.!' : 'PULPED…'; h.classList.toggle('lose', !won);
+    h.style.animation = 'none'; void h.offsetWidth; h.style.animation = '';
     e.querySelector('p').textContent = won ? `Zest is the new champ. ${st.time.toFixed(1)} s, ${st.hits} hits landed, ${Math.round(st.hp)} HP left.` : `El Naranjo keeps the belt… for now. ${st.hits} hits landed.`;
   },
 };
