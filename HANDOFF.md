@@ -57,15 +57,14 @@ The harness serves jsdelivr requests from the local `node_modules/three`, becaus
 - [x] Gameplay: player move, jump, dodge, 3-hit combo, spin, grab and throw; boss idle, bash, rolling charge (stuns on the ropes), seed barrage, leap slam with shockwave, phase roars; props restock. Bot-tested: damage lands both ways with no errors.
 - [x] HUD, banners, win and lose cards, retry, replay, mute, skip, touch controls (joystick and buttons appear on coarse pointers).
 - [x] Focus pause: when the page loses keyboard focus mid-fight (for example when keys go to the chat around the artifact), the fight pauses and shows "Click the game to keep playing" (`setPaused` in `src/main.js`). Smoke-tested headless; not tested on a phone.
-- [ ] A full fight played to K.O. The headless sim is too slow, so phase 2 and 3 transitions and the win and lose cards are unverified in a real run.
+- [x] A full fight played to K.O. Headless-verified on v2 2026-09-24 (playwright + swiftshader, file:// build): fight starts at 420/100 HP with 10 props incl. 2 blueberry + 1 chocolate chunk; phase 2 banner "ROUND 2: PIP STORM" and phase 3 banner "FINAL ROUND: PULP SPLASH" both fire with the `roar` state; music switches battle → boss3 → win; K.O. lands mode `won`, 1.4 s of 0.22x slow-mo, big `fx.burst` + juice fountain; win card "K.O.!" and lose card "SQUEEZED!" render with stats; R-key retry resets to 420/100; touch layout on coarse-pointer mobile shows joystick + GRAB/SPIN/DODGE/JUMP/PUNCH. Zero JS errors across all runs. (Headless swiftshader runs ~10x slow, so timings were verified via game-state, not wall clock.)
 
 ## Next up (priority order)
-1. **Play-test a full fight in a real browser.** Tune boss HP (420), damage numbers and cooldowns so a first win takes about 2–3 minutes. Confirm the phase 2 and 3 banners and music switch, and the win and lose cards.
+1. **Real-device play-test.** Headless verification is done (see above); still untested on a physical phone: touch feel, performance (consider shadows to 1024 and bloom off on coarse pointers), and a full organic fight to K.O. in a real browser at full speed.
 2. **Act 2→3 transition.** Today it is a crossfade onto a matching 3D frame. The vision is for the paper layers to peel or fly apart into the 3D scene. Try rendering the 2D layers as textured planes in the 3D scene for the last 2 s.
-3. **K.O. moment.** Slow-motion final hit, a big juice fountain, and the camera orbiting Zest cheering.
+3. **K.O. camera orbit.** Slow-mo, fountain, burst and stinger are in and verified; the camera orbit around cheering Zest is still open.
 4. **3D Zest polish.** Mouth shapes (grit, O), a stronger rubber-hose stretch on punches, and a clearer goggles silhouette. The lemon still reads slightly olive under the toon ramp.
-5. **Mobile.** Test touch controls on a phone and check performance (drop shadows to 1024 and bloom off on coarse pointers).
-6. **Optional Blender pass on Alan's device:** Mantaflow juice splash for the K.O. and the act 3 geysers, rendered to a transparent video and layered in.
+5. **Optional Blender pass on Alan's device:** Mantaflow juice splash for the K.O. and the act 3 geysers, rendered to a transparent video and layered in.
 
 ## v2 (branch `build/v2`, started 2026-09-24)
 Reference: the Opus Lemon vs Orange clip Alan shared — local copy `~/workspace/orange-vs-lemon/ref/orangevslemon-ref.mp4` (87 s, pulled from his Drive; from https://www.youtube.com/watch?v=2WyFHZ6lkWE). Used for technique, mood, assets and music direction only — character designs stay original per the style rules above (no headband, no mustache/monocle/crown). The clip is effectively silent, so the v2 battle theme is an original composition in a bouncy cartoon-fight spirit.
@@ -75,6 +74,15 @@ v2 changes so far:
 - `fx.burst`: big white impact flash + shock ring + juice on every hit (reference's crunchy hit feel).
 - K.O.: 1.4 s of 0.22x slow-motion, juice fountain, big burst, and a `ko` stinger (descending boom + splash + bell). Camera orbit around cheering Zest still open.
 - New `battle`/`boss3` arrangement: marimba-ish triangle lead playing an original 4-bar melody over a walking bass (148/164 BPM kept).
+
+### v2 verification (2026-09-24, headless playwright + swiftshader, file:// build of this branch)
+- Fight start: mode `fight`, boss 420 HP / player 100 HP, 10 props (2 blueberry, 1 chocolate chunk in the mix), `battle` music, red-gingham lids visible. Screenshot-verified.
+- Phase 2 at 277 HP: banner "ROUND 2: PIP STORM" + "He spits seeds now. Throw them back!", boss `roar` state, music stays `battle`.
+- Phase 3 at 138 HP: banner "FINAL ROUND: PULP SPLASH", music switches to `boss3`. Impact flash (`fx.burst` starburst + shock ring + juice) screenshot-verified.
+- K.O.: final hit → mode `won`, boss `dead`, slowmo 1.4 s at 0.22x, big burst + 6× juice fountain, `win` music, juice fountain continues while `endT < 1.6`. Screenshots of the slow-mo hit and fountain look right.
+- End cards: "K.O.!" with stats (time, hits, HP left) and "SQUEEZED!" both render; "Fight again"/"Watch the film" buttons present; R key retries to a fresh 420/100 fight.
+- Touch: coarse-pointer mobile emulation shows the joystick + GRAB/SPIN/DODGE/JUMP/PUNCH buttons; `#keys` legend hidden; portrait layout screenshot-verified.
+- Zero JS errors across the full run. Note: swiftshader runs ~10x slow, so slow-mo/fountain/card timings were asserted on game state, not wall clock.
 
 ## Known bugs / rough edges
 - The act 3 handoff camera briefly sits close behind Zest (around 55.5–57 s) before the gameplay camera settles. The anti-clip keeps it outside him, but it could frame better.
