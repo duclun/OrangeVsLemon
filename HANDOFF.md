@@ -16,6 +16,15 @@ What v1.5 changed (all original, made in code):
 - **Juice:** `fx.burst()` glossy blob splash at the stomp (act 3) and at the K.O.; K.O. now has 1.8 s of slow motion and an orbiting camera round the cheering Zest.
 - **Music:** a new original score (A major / F# minor, marimba, pizzicato, glockenspiel, whistle lead, brass stabs, timpani, claps). New `lift` cue: a 4-bar dominant build that lands on the FIGHT bell. Per-section loudness trims. `tools/render-music.mjs` renders every mode to WAV offline for checking.
 
+## Mobile fixes (after v1.5)
+Alan saw a WebGL error and a cut-off view on his Pixel 10. Changes:
+- **Renderer (`createWorld` in `world3d.js`):** `MOBILE` (coarse pointer or small screen) caps pixel ratio at 1.5 and the shadow map at 1024. The canvas no longer asks for MSAA (it was wasted under the composer); desktop gets 4× MSAA on the composer target instead. Renderer creation retries with softer options and throws a readable message. `halfFloatOK()` probes whether half-float targets are renderable; if not, bloom and the PMREM environment are skipped and the composer uses 8-bit targets (`?lowgl` forces this path). Context loss is handled (`preventDefault`, rendering pauses until restore).
+- **Shader:** `GradeShader` had `smoothstep(1.25, 0.0, …)`, which is undefined in GLSL and misbehaves on some phone GPUs. Now `1.0 - smoothstep(0.0, 1.25, …)`.
+- **Framing:** `fitCamera()` widens the vertical FOV on screens narrower than 16:9 (capped at 82°), so a phone held upright still sees the fighters. The 2D film letterboxes (contain) below 1.3:1 instead of cropping.
+- **Layout:** `100vh` → `100%`, `viewport-fit=cover` with safe-area insets on HUD, top bar and touch controls, tighter controls under 500px height, touch controls only during the fight, a "best played sideways" note on the start card in portrait, and fullscreen + landscape lock on Play for touch devices (refused inside some frames; harmless).
+- **Errors on screen:** `#err` now also shows unhandled rejections and three.js WebGL/shader `console.error`s, so a phone user can read out the real message.
+- Tested with Chromium Pixel emulation (SwiftShader), portrait 412×915 and landscape 915×360. **Not yet tested on a real Pixel 10**; the original error text is unknown.
+
 ## Style rules (non-negotiable)
 - **Original designs only.** Zest wears a peel scarf, goggles on the forehead, a band-aid and red sneakers. El Naranjo wears a purple luchador mask with gold flame trim, a champion belt and purple boots. Don't use a headband lemon, and don't give the orange a crown, mustache or monocle. Those belong to the reference video.
 - **Palette:** lemon `#ffdc3f` / `#e9b41e`; orange `#ff8f24` / `#dc6a10`; mask purple `#8e2fa6`; gold `#ffd24a`; warm kitchen creams; sage and mint tiles; honey wood.
@@ -82,7 +91,7 @@ node shoot.mjs "index.html?t=30" shots/t30.png "GAME.T > 30.5" ["optional JS to 
 2. **Act 2→3 transition.** Today it is a crossfade onto a matching 3D frame. The vision is for the paper layers to peel or fly apart into the 3D scene. Try rendering the 2D layers as textured planes in the 3D scene for the last 2 s.
 3. **K.O. moment.** Slow-motion final hit, a big juice fountain, and the camera orbiting Zest cheering.
 4. **3D Zest polish.** Mouth shapes (grit, O), a stronger rubber-hose stretch on punches, and a clearer goggles silhouette. The lemon still reads slightly olive under the toon ramp.
-5. **Mobile.** Test touch controls on a phone and check performance (drop shadows to 1024 and bloom off on coarse pointers).
+5. **Mobile.** Confirm the mobile fixes on Alan's Pixel 10 (see above). If the WebGL error persists, get its exact text from the on-screen error box.
 6. **Optional Blender pass on Alan's device:** Mantaflow juice splash for the K.O. and the act 3 geysers, rendered to a transparent video and layered in.
 
 ## Known bugs / rough edges
