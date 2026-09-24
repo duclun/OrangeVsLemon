@@ -63,16 +63,22 @@ export class Sound {
       if (st % 2 === 0) this.pluck(f(root + 24 + q[(s / 2 | 0) % 3]), t, 0.18, 0.05);
       return;
     }
-    // battle / boss3
+    // battle / boss3 — v2: bouncy marimba lead over a walking bass (original tune, reference-clip spirit)
     const hot = m === 'boss3';
     if (st % 4 === 0 || (hot && st === 14)) this.kick(t, 0.8);
     if (st % 8 === 4) this.snare(t, 0.35);
-    if (st % 2 === 1) this.hat(t, 0.05);
+    if (st % 2 === 1) this.hat(t, hot ? 0.07 : 0.05);
     const bl = [0, 0, 12, 0, 7, 0, 12, 10];
     if (st % 2 === 0) this.bass(f(root - 12 + bl[(st >> 1) % 8]), t, 0.12, 0.22);
-    const arp = [0, 1, 2, 1, 2, 0, 2, 1];
-    if (hot || st % 2 === 0) this.pluck(f(root + 12 + q[arp[st % 8]] + (st >= 8 ? 12 : 0)), t, 0.1, hot ? 0.06 : 0.07, 'square');
-    if (st === 0 && bar % 2 === 0) this.lead(f(root + 24 + q[bar % 3]), t, this.stepDur() * 6, 0.05);
+    if (hot && st % 2 === 1) this.bass(f(root - 12 + bl[((st - 1) >> 1) % 8] + 12), t, 0.08, 0.1);
+    const scale = bar === 0 ? [0, 2, 3, 5, 7, 8, 10] : [0, 2, 4, 5, 7, 9, 11];   // minor on Dm, major elsewhere
+    const MEL = [4, 2, 4, -1, 5, 4, 2, 1, 0, 2, 4, 2, 5, -1, 4, 2,
+                 4, 2, 4, -1, 5, 7, 5, 4, 2, 1, 2, 4, 2, -1, 1, 0,
+                 4, 2, 4, -1, 5, 4, 2, 1, 0, 2, 4, 2, 5, -1, 4, 2,
+                 7, 5, 4, 2, 4, 5, 7, -1, 4, 2, 1, 2, 0, -1, -1, -1];
+    const deg = MEL[(bar * 16 + st) % 64];
+    if (deg >= 0) this.pluck(f(root + 24 + scale[deg % 7]), t, 0.13, hot ? 0.08 : 0.06, 'triangle');
+    if (st === 0 && bar % 2 === 0) this.lead(f(root + 24 + scale[4]), t, this.stepDur() * 6, 0.04);
   }
 
   // ---- instruments ----
@@ -134,6 +140,8 @@ export class Sound {
       case 'ui': this.osc('triangle', 1000, t, 0.06, 0.12 * vol, B); break;
       case 'dodge': { const { fl } = this.noiseHit(t, 0.18, 0.25 * vol, 'bandpass', 2000, 3, B); fl.frequency.exponentialRampToValueAtTime(500, t + 0.15); break; }
       case 'stun': for (let i = 0; i < 4; i++) this.osc('sine', 1400 + i * 300, t + i * 0.07, 0.15, 0.08 * vol, B); break;
+      case 'ko': { const { o } = this.osc('sine', 420, t, 1.2, 0.5 * vol, B); o.frequency.exponentialRampToValueAtTime(48, t + 1.0);
+        this.noiseHit(t, 0.8, 0.35 * vol, 'lowpass', 2400, 1, B); this.sfx('splash', 1.3); this.sfx('bell', 0.7); break; }
     }
   }
   kickSfx(t, v) { const { o } = this.osc('sine', 160, t, 0.2, v, this.sfxBus); o.frequency.exponentialRampToValueAtTime(45, t + 0.18); }

@@ -14,6 +14,8 @@ const PROPS = {
   sugar: { name: 'Sugar cube', dmg: 14, stun: 0.8, r: 0.25, col: 0xffffff },
   bean: { name: 'Coffee bean', dmg: 9, r: 0.2, col: 0x4a2a16 },
   berry: { name: 'Raspberry', dmg: 11, r: 0.24, col: 0xd8264a, juice: 0xd8264a },
+  blueberry: { name: 'Blueberry', dmg: 10, r: 0.22, col: 0x2e4fd8, juice: 0x2e4fd8 },
+  choc: { name: 'Chocolate chunk', dmg: 13, stun: 0.5, r: 0.26, col: 0x4a2a16 },
   ice: { name: 'Ice cube', dmg: 16, slow: 3, r: 0.27, col: 0xcfefff },
   seed: { name: 'Pip', dmg: 7, r: 0.15, col: 0xf6ecc8 },
 };
@@ -27,17 +29,24 @@ export function createGame(world, sound, ui) {
   // ---------- prop meshes ----------
   const propGeo = {
     sugar: new THREE.BoxGeometry(0.44, 0.44, 0.44), bean: new THREE.SphereGeometry(1, 14, 10), berry: new THREE.IcosahedronGeometry(0.24, 1),
+    blueberry: new THREE.SphereGeometry(1, 16, 12), choc: new THREE.BoxGeometry(0.5, 0.38, 0.44),
     ice: new THREE.BoxGeometry(0.5, 0.5, 0.5), seed: new THREE.SphereGeometry(1, 12, 8),
   };
   const propMat = {
     sugar: new THREE.MeshPhysicalMaterial({ color: 0xfffdf5, roughness: 0.7, sheen: 1, sheenColor: 0xffffff, clearcoat: 0.2 }),
     bean: toon(0x5a321a), berry: new THREE.MeshStandardMaterial({ color: 0xd8264a, flatShading: true, roughness: 0.35 }),
+    blueberry: new THREE.MeshStandardMaterial({ color: 0x2e4fd8, roughness: 0.22, metalness: 0.05 }),
+    choc: toon(0x4a2a16),
     ice: new THREE.MeshPhysicalMaterial({ color: 0xdff4ff, roughness: 0.02, transparent: true, opacity: 0.55, clearcoat: 1, envMapIntensity: 2 }),
     seed: toon(0xf6ecc8),
   };
   function makePropMesh(type) {
     const m = new THREE.Mesh(propGeo[type], propMat[type]); m.castShadow = true;
     if (type === 'bean') m.scale.set(0.17, 0.12, 0.25); if (type === 'seed') m.scale.set(0.1, 0.07, 0.17);
+    if (type === 'blueberry') { m.scale.set(0.22, 0.18, 0.22);
+      const crown = new THREE.Mesh(new THREE.CircleGeometry(0.07, 8), new THREE.MeshBasicMaterial({ color: 0x1a2450 }));
+      crown.rotation.x = -Math.PI / 2; crown.position.y = 0.92; m.add(crown); }
+    if (type === 'choc') m.rotation.set(0.35, Math.random() * 6, 0.2);
     if (type !== 'ice') outline(m, type === 'bean' || type === 'seed' ? 0.15 : 0.08);
     if (type === 'bean') { const g = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.02, 1.6), new THREE.MeshBasicMaterial({ color: 0x2a160a })); g.position.y = 0.2; m.add(g); }
     if (type === 'berry') { const l = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.08, 5), toon(0x4d9a2a)); l.position.y = 0.24; m.add(l); }
@@ -55,12 +64,12 @@ export function createGame(world, sound, ui) {
     for (const p of S.proj || []) scene.remove(p.mesh);
     fx.clearSplats();
     Object.assign(S, {
-      mode: 'film', t: 0, hitstop: 0, shake: 0, camLook: V(0, 1.4, 0), camDir: V(-1, 0, 0), elapsed: 0,
+      mode: 'film', t: 0, hitstop: 0, slowmo: 0, shake: 0, camLook: V(0, 1.4, 0), camDir: V(-1, 0, 0), elapsed: 0,
       player: { pos: V(-3, 0, 0), vel: V(), yaw: Math.PI / 2, hp: 100, grounded: true, action: null, combo: 0, comboT: 0, iframes: 0, dodgeCd: 0, carry: null, hits: 0, flash: 0, runPh: 0 },
       boss: { pos: V(3.5, 0, 0), vel: V(), yaw: -Math.PI / 2, hp: 420, max: 420, state: 'intro', st: 0, cd: 1.6, phase: 1, chargeDir: V(), bounces: 0, flash: 0, stun: 0, slow: 0, leapFrom: V(), target: V(), volleys: 0, telegraph: null, shock: null, walkPh: 0 },
       props: [], proj: [], dropT: 0,
     });
-    const types = ['sugar', 'sugar', 'bean', 'bean', 'berry', 'berry', 'ice', 'sugar'];
+    const types = ['sugar', 'sugar', 'bean', 'blueberry', 'berry', 'choc', 'ice', 'sugar', 'blueberry', 'bean'];
     types.forEach((ty, i) => { const a = i / types.length * Math.PI * 2 + 0.3, r = 6 + (i % 3) * 1.8; spawnProp(ty, V(Math.cos(a) * r, 0, Math.sin(a) * r)); });
     placeChars();
   }
@@ -179,7 +188,8 @@ export function createGame(world, sound, ui) {
     const B = S.boss; if (B.state === 'roar' || B.state === 'dead' || B.state === 'intro') return false;
     if (B.state === 'stunned') dmg = Math.round(dmg * 1.5);
     B.hp = Math.max(0, B.hp - dmg); B.flash = 1; S.player.hits++;
-    fx.juice(point, ORANGE, kind === 'heavy' ? 34 : 18, kind === 'heavy' ? 6 : 4.5, 5); fx.spark(point, kind === 'heavy' ? 2.4 : 1.6);
+    fx.juice(point, ORANGE, kind === 'heavy' ? 34 : 18, kind === 'heavy' ? 6 : 4.5, 5);
+    fx.burst(point, kind === 'heavy' ? 3.2 : kind === 'finisher' ? 2.6 : 1.8, ORANGE);
     sound.sfx(kind === 'heavy' ? 'heavy' : 'hit'); sound.sfx('splash', 0.5); hitstop(kind === 'heavy' ? 0.11 : 0.065); shake(kind === 'heavy' ? 0.45 : 0.2);
     ui.bossBar(B.hp / B.max, B.phase);
     if (B.hp <= 0) { setBoss('dead'); return true; }
@@ -193,7 +203,8 @@ export function createGame(world, sound, ui) {
     P.hp = Math.max(0, P.hp - dmg); P.iframes = 0.9; P.flash = 1; P.action = { type: 'hurt', t: 0, dur: 0.35 };
     const away = V(P.pos.x - from.x, 0, P.pos.z - from.z).normalize(); P.vel.copy(away.multiplyScalar(knock)).setY(5); P.grounded = false;
     if (P.carry) { P.carry.state = 'fly'; P.carry.vel.set(0, 3, 0); P.carry = null; }
-    fx.juice(P.pos.clone().add(V(0, 1.2, 0)), LEMON, 22, 4, 4); sound.sfx('hurt'); shake(0.4); hitstop(0.08);
+    fx.juice(P.pos.clone().add(V(0, 1.2, 0)), LEMON, 22, 4, 4); fx.burst(P.pos.clone().add(V(0, 1.2, 0)), 2.2, LEMON);
+    sound.sfx('hurt'); shake(0.4); hitstop(0.08);
     ui.playerBar(P.hp / 100);
     if (P.hp <= 0) { S.mode = 'lost'; S.endT = 0; sound.setMusic('lose'); sound.sfx('slam'); ui.hint(null); }
   }
@@ -203,7 +214,8 @@ export function createGame(world, sound, ui) {
     if (state === 'roar') { sound.sfx('roar'); shake(0.6); B.flash = 0;
       ui.banner(B.phase === 2 ? 'ROUND 2: PIP STORM' : 'FINAL ROUND: PULP SPLASH', B.phase === 2 ? 'He spits seeds now. Throw them back!' : 'Jump the shockwaves!');
       sound.setMusic(B.phase === 3 ? 'boss3' : 'battle'); }
-    if (state === 'dead') { sound.sfx('slam'); sound.sfx('splash'); shake(1); hitstop(0.25); S.mode = 'won'; S.endT = 0; sound.setMusic('win'); ui.hint(null);
+    if (state === 'dead') { sound.sfx('slam'); sound.sfx('ko'); sound.sfx('splash'); shake(1); hitstop(0.25); S.slowmo = 1.4; S.mode = 'won'; S.endT = 0; sound.setMusic('win'); ui.hint(null);
+      fx.burst(B.pos.clone().add(V(0, 1.6, 0)), 6, ORANGE);
       for (let i = 0; i < 6; i++) fx.juice(B.pos.clone().add(V(0, 1.6, 0)), ORANGE, 30, 8, 10); }
     if (state === 'stunned') { sound.sfx('stun'); }
   }
@@ -385,7 +397,7 @@ export function createGame(world, sound, ui) {
           if (hurtBoss(def.dmg, p.pos.clone(), 'hit')) { if (def.stun && B.state !== 'dead' && B.state !== 'roar') setBoss('stunned'); if (def.slow) B.slow = def.slow;
             if (def.juice) fx.juice(p.pos, def.juice, 14, 4, 3); if (p.type === 'ice' || p.type === 'sugar') fx.juice(p.pos, 0xffffff, 12, 4, 3); }
           p.vel.set(-p.vel.x * 0.25, 4, -p.vel.z * 0.25); p.thrown = false;
-          if (p.type === 'berry' || p.type === 'seed') { scene.remove(p.mesh); S.props.splice(i, 1); continue; } } }
+          if (p.type === 'berry' || p.type === 'blueberry' || p.type === 'seed') { scene.remove(p.mesh); S.props.splice(i, 1); continue; } } }
         if (p.pos.y < def.r) { p.pos.y = def.r; if (Math.abs(p.vel.y) > 2) { p.vel.y *= -0.35; p.vel.x *= 0.6; p.vel.z *= 0.6; } else { p.vel.set(0, 0, 0); p.state = 'rest'; p.thrown = false; } }
         const r = Math.hypot(p.pos.x, p.pos.z), lim = ARENA_R - 0.3; if (r > lim) { p.pos.x *= lim / r; p.pos.z *= lim / r; p.vel.x *= -0.5; p.vel.z *= -0.5; }
       }
@@ -399,7 +411,7 @@ export function createGame(world, sound, ui) {
         if (seeds < 12 && Math.hypot(q.pos.x, q.pos.z) < ARENA_R - 0.5) { scene.remove(q.mesh); spawnProp('seed', q.pos.setY(0.15)); } else scene.remove(q.mesh); } }
     // restock falling props
     S.dropT -= dt; const kinds = S.props.filter(p => p.type !== 'seed').length;
-    if (S.dropT <= 0 && kinds < 6) { S.dropT = 4; const a = Math.random() * 6.283, r = 3 + Math.random() * 7, ty = ['sugar', 'bean', 'berry', 'ice'][Math.floor(Math.random() * 4)];
+    if (S.dropT <= 0 && kinds < 6) { S.dropT = 4; const a = Math.random() * 6.283, r = 3 + Math.random() * 7, ty = ['sugar', 'bean', 'berry', 'blueberry', 'choc', 'ice'][Math.floor(Math.random() * 6)];
       spawnProp(ty, V(Math.cos(a) * r, 12, Math.sin(a) * r), V(0, -1, 0)); }
   }
 
@@ -416,10 +428,16 @@ export function createGame(world, sound, ui) {
   function update(rdt) {
     let dt = Math.min(rdt, 1 / 30);
     if (S.hitstop > 0) { S.hitstop -= rdt; dt = 0; }
+    if (S.slowmo > 0) { S.slowmo -= rdt; dt *= 0.22; }   // v2: K.O. slow motion
     S.t += dt;
     if (S.mode === 'fight') { S.elapsed += dt; updatePlayer(dt); updateBoss(dt); updateProps(dt); }
     else if (S.mode === 'won' || S.mode === 'lost') {
       S.endT += rdt; updateBoss(dt); updateProps(dt);
+      if (S.mode === 'won' && S.endT < 1.6) {   // v2: K.O. juice fountain
+        const bp = S.boss.pos;
+        for (let i = 0; i < 3; i++) fx.juice(bp.clone().add(V((Math.random() - 0.5) * 2.4, 1.1, (Math.random() - 0.5) * 2.4)), Math.random() < 0.75 ? ORANGE : LEMON, 9, 2.5, 13);
+        if (Math.random() < 0.3) fx.spark(bp.clone().add(V((Math.random() - 0.5) * 3, 3 + Math.random() * 3, (Math.random() - 0.5) * 3)), 2.2);
+      }
       poseZest(S.mode === 'won' ? 'cheer' : 'ko', dt); zest.visible = true;
       if (S.mode === 'lost') { S.player.pos.y = 0; zest.position.copy(S.player.pos); }
       if (S.endT > 2.2 && !S.endShown) { S.endShown = true; ui.end(S.mode === 'won', { time: S.elapsed, hits: S.player.hits, hp: S.player.hp }); }
