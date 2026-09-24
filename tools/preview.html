@@ -1,0 +1,16 @@
+<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;overflow:hidden;background:#000}</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
+</head><body><canvas id="c"></canvas>
+<script type="module">
+import { createWorld, makeZest, makeNaranjo } from '../src/world3d.js';
+const w = createWorld(document.getElementById('c'));
+const z = makeZest(), n = makeNaranjo();
+z.position.set(-1.6,0,0); z.rotation.y = 0.5; n.position.set(1.8,0,-0.5); n.rotation.y = -0.4;
+w.scene.add(z, n);
+const v = new URLSearchParams(location.search).get('v') || 'close';
+if (v==='close'){ w.camera.position.set(0,2.2,7.5); w.camera.lookAt(0,1.4,0); }
+else { w.camera.position.set(0,12,24); w.camera.lookAt(0,0,0); }
+w.fx.juice(new w.THREE.Vector3(0,2,0), 0xffb43a, 60, 4, 4);
+for(let i=0;i<20;i++){ w.fx.splat((Math.random()-.5)*8,(Math.random()-.5)*8, i%2?0xffc83a:0xff8f24, 1.5); }
+let t=0; function loop(){ t+=1/60; w.fx.update(1/60); w.render(); if(t<1) requestAnimationFrame(loop); else window.READY=true; } loop();
+</script></body></html>
