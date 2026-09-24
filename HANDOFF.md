@@ -74,7 +74,7 @@ node shoot.mjs "index.html?t=30" shots/t30.png "GAME.T > 30.5" ["optional JS to 
 - [x] Focus pause: when the page loses keyboard focus mid-fight (for example when keys go to the chat around the artifact), the fight pauses and shows "Click the game to keep playing" (`setPaused` in `src/main.js`). Smoke-tested headless; not tested on a phone.
 - [ ] A full fight played to K.O. The headless sim is too slow, so phase 2 and 3 transitions and the win and lose cards are unverified in a real run.
 - [x] v1.5 look, palette, paper-to-3D handoff, comic UI, juice bursts, K.O. slow-mo, new score. Screenshot-tested on Alan's machine at 3, 7, 15, 30, 39, 41.5, 43.2, 44, 47, 48, 59 s, in the fight (bot), on the lose card and at the K.O. The score was rendered offline without errors (levels checked), **but no human has listened to it yet**.
-- [ ] `dist/` and the published artifact are still v1. Rebuild with `tools/build-artifact.py` and republish when Alan wants the online version updated.
+- [x] `dist/` rebuilt and the artifact republished as v1.5 (version 3 of the same link).
 
 ## Next up (priority order)
 0. **v1.5 review with Alan:** listen to the new score (film1 tempo and the whistle tune are the most subjective), and check the paper-standee inflate reads well at full speed (41–44 s).

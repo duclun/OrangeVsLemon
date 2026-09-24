@@ -1,27 +1,55 @@
 // Act 3 (3D film shots) and the playable boss fight. Both run in the same scene so the handoff has no cut.
 import * as THREE from 'three';
 import { makeZest, makeNaranjo, ARENA_R, toon, outline } from './world3d.js';
+import { drawZest, drawNaranjo } from './film2d.js';
 
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const ease = t => { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); };
+const easeOutBack = t => { t = clamp(t, 0, 1); const c = 2.2; return 1 + (c + 1) * Math.pow(t - 1, 3) + c * Math.pow(t - 1, 2); };
 const damp = (a, b, s, dt) => a + (b - a) * (1 - Math.exp(-s * dt));
 const angDamp = (a, b, s, dt) => { let d = ((b - a + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI; return a + d * (1 - Math.exp(-s * dt)); };
 const yawTo = v => Math.atan2(v.x, v.z);
 
 const LEMON = 0xffd83a, ORANGE = 0xff8a1c;
 const PROPS = {
-  sugar: { name: 'Sugar cube', dmg: 14, stun: 0.8, r: 0.25, col: 0xffffff },
-  bean: { name: 'Coffee bean', dmg: 9, r: 0.2, col: 0x4a2a16 },
-  berry: { name: 'Raspberry', dmg: 11, r: 0.24, col: 0xd8264a, juice: 0xd8264a },
-  ice: { name: 'Ice cube', dmg: 16, slow: 3, r: 0.27, col: 0xcfefff },
-  seed: { name: 'Pip', dmg: 7, r: 0.15, col: 0xf6ecc8 },
+  sugar: { name: 'Sugar cube', dmg: 14, stun: 0.8, r: 0.25, col: 0xffffff, word: 'SUGAR RUSH!' },
+  bean: { name: 'Coffee bean', dmg: 9, r: 0.2, col: 0x4a2a16, word: 'JOLT!' },
+  berry: { name: 'Raspberry', dmg: 11, r: 0.24, col: 0xd8264a, juice: 0xd8264a, word: 'SPLAT!' },
+  ice: { name: 'Ice cube', dmg: 16, slow: 3, r: 0.27, col: 0xcfefff, word: 'BRAIN FREEZE!' },
+  seed: { name: 'Pip', dmg: 7, r: 0.15, col: 0xf6ecc8, word: 'PIP!' },
 };
+
+// v1.5 2D->3D handoff: the act 2 paper drawings become flat cut-out standees in the 3D room, with a white sticker edge.
+// The camera orbits to show they are paper, then each one "inflates" into its 3D rig.
+function paperCard(draw, pose, height) {
+  const S = 1024, c = document.createElement('canvas'); c.width = c.height = S;
+  const art = document.createElement('canvas'); art.width = art.height = S; const a = art.getContext('2d');
+  a.translate(S / 2, S - 40); a.scale(2.4, 2.4); draw(a, { x: 0, y: 0, t: 0, blink: 0, look: 1, shade: 1, ...pose });
+  const white = document.createElement('canvas'); white.width = white.height = S; const w = white.getContext('2d');
+  w.drawImage(art, 0, 0); w.globalCompositeOperation = 'source-in'; w.fillStyle = '#fffaf0'; w.fillRect(0, 0, S, S);
+  const g = c.getContext('2d');
+  for (let i = 0; i < 16; i++) { const an = i / 16 * Math.PI * 2; g.drawImage(white, Math.cos(an) * 12, Math.sin(an) * 12); }
+  g.drawImage(art, 0, 0);
+  // crop to the drawn pixels so the plane hugs the figure
+  const d = g.getImageData(0, 0, S, S).data; let x0 = S, x1 = 0, y0 = S, y1 = 0;
+  for (let y = 0; y < S; y += 2) for (let x = 0; x < S; x += 2) if (d[(y * S + x) * 4 + 3] > 20) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
+  const u = height / (y1 - y0), geo = new THREE.PlaneGeometry((x1 - x0) * u, height);
+  const uv = geo.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, (x0 + uv.getX(i) * (x1 - x0)) / S, 1 - (y1 - uv.getY(i) * (y1 - y0)) / S);
+  geo.translate(((x0 + x1) / 2 - S / 2) * u, height / 2 + (S - 40 - y1) * u, 0);
+  const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: tex, alphaTest: 0.5, transparent: true, side: THREE.DoubleSide, roughness: 0.9 }));
+  m.castShadow = true; return m;
+}
 
 export function createGame(world, sound, ui) {
   const { scene, camera, fx } = world;
   const zest = makeZest(), nar = makeNaranjo();
-  zest.scale.setScalar(1.2); scene.add(zest, nar);
+  zest.scale.setScalar(1.2);
+  // Each rig sits in a world-aligned wrapper whose z scale flattens it to paper and back during the handoff.
+  const flatZ = new THREE.Group(), flatN = new THREE.Group(); flatZ.add(zest); flatN.add(nar); scene.add(flatZ, flatN);
+  const cardZ = paperCard(drawZest, { face: 1, mood: 'fierce', arms: 'fists' }, 2.3), cardN = paperCard(drawNaranjo, { face: -1, mood: 'smug', arms: 'idle' }, 3.5);
+  scene.add(cardZ, cardN);
   const Z = zest.userData, N = nar.userData;
 
   // ---------- prop meshes ----------
@@ -58,7 +86,7 @@ export function createGame(world, sound, ui) {
       mode: 'film', t: 0, hitstop: 0, shake: 0, camLook: V(0, 1.4, 0), camDir: V(-1, 0, 0), elapsed: 0,
       player: { pos: V(-3, 0, 0), vel: V(), yaw: Math.PI / 2, hp: 100, grounded: true, action: null, combo: 0, comboT: 0, iframes: 0, dodgeCd: 0, carry: null, hits: 0, flash: 0, runPh: 0 },
       boss: { pos: V(3.5, 0, 0), vel: V(), yaw: -Math.PI / 2, hp: 420, max: 420, state: 'intro', st: 0, cd: 1.6, phase: 1, chargeDir: V(), bounces: 0, flash: 0, stun: 0, slow: 0, leapFrom: V(), target: V(), volleys: 0, telegraph: null, shock: null, walkPh: 0 },
-      props: [], proj: [], dropT: 0,
+      props: [], proj: [], dropT: 0, slowmo: 0, orbit: null,
     });
     const types = ['sugar', 'sugar', 'bean', 'bean', 'berry', 'berry', 'ice', 'sugar'];
     types.forEach((ty, i) => { const a = i / types.length * Math.PI * 2 + 0.3, r = 6 + (i % 3) * 1.8; spawnProp(ty, V(Math.cos(a) * r, 0, Math.sin(a) * r)); });
@@ -136,7 +164,8 @@ export function createGame(world, sound, ui) {
     return { pos, look };
   }
   const shots = [
-    { at: 0, f: ft => { const k = ease(ft / 5); return { pos: V(0, 1.9, 8.5).lerp(V(2, 9, 22), k), look: V(0, 1.5, 0).lerp(V(0, 0.5, 0), k) }; } },
+    // v1.5: pull back and swing round so the paper standees read as flat cut-outs standing in a real room
+    { at: 0, f: ft => { const k = ease(ft / 5); return { pos: V(0, 1.9, 8.5).lerp(V(11, 7.5, 17), k), look: V(0, 1.5, 0).lerp(V(0, 0.8, 0), k) }; } },
     { at: 5, f: ft => { const a = Math.PI - 0.9 + (ft - 5) * 0.22, B = S.boss.pos; return { pos: V(B.x + Math.cos(a) * 7, 2.4, B.z + Math.sin(a) * 7), look: B.clone().add(V(0, 1.9, 0)) }; } },
     { at: 11, f: ft => { const k = ease((ft - 11) / 5), P = S.player.pos; return { pos: P.clone().add(V(2.6, 1.8, 2.6).lerp(V(2.2, 1.7, 2.3), k)), look: P.clone().add(V(0, 1.5, 0)) }; } },
     { at: 15.6, f: () => gameCamIdeal() },
@@ -153,10 +182,24 @@ export function createGame(world, sound, ui) {
   }
   const events = new Set();
   function once(name, cond, fn) { if (cond && !events.has(name)) { events.add(name); fn(); } }
+  // paper standees inflate into the 3D rigs (ft = seconds into act 3)
+  const INFLATE = [[cardZ, flatZ, zest, 3.0, LEMON, 1.3], [cardN, flatN, nar, 3.45, ORANGE, 1.9]];
+  function paperToRig(ft) {
+    for (const [card, wrap, rig, at, col, cy] of INFLATE) {
+      const k = clamp((ft - at) / 0.6, 0, 1);
+      card.position.copy(rig.position); rig.visible = ft >= at;
+      card.material.opacity = 1 - clamp(k / 0.22, 0, 1); card.visible = card.material.opacity > 0;
+      wrap.scale.z = ft < at ? 0.02 : Math.max(0.02, easeOutBack(k));
+      wrap.scale.y = 1 + Math.sin(k * Math.PI) * 0.08 * (1 - k);
+      once('inflate' + at, ft >= at && ft < at + 0.5, () => { const p = rig.position.clone().add(V(0, cy, 0));
+        sound.sfx('pop'); fx.spark(p, 2.2); fx.juice(p, col, 16, 3.5, 3); fx.juice(p, 0xffffff, 10, 3, 2); });
+    }
+  }
   function filmUpdate(ft, dt) {
     S.t += dt;
+    paperToRig(ft);
     once('roar', ft >= 6, () => { sound.sfx('roar'); S.shake = 0.35; });
-    once('slam', ft >= 8.2, () => { sound.sfx('slam'); S.shake = 0.8; fx.ring(S.boss.pos, { speed: 14 }); for (let i = 0; i < 20; i++) fx.juice(S.boss.pos.clone().add(V(0, 0.3, 0)), ORANGE, 2, 7, 5); });
+    once('slam', ft >= 8.2, () => { sound.sfx('slam'); sound.sfx('splash'); S.shake = 0.8; fx.ring(S.boss.pos, { speed: 14 }); fx.burst(S.boss.pos.clone().setY(0.2), ORANGE, 1.1); for (let i = 0; i < 20; i++) fx.juice(S.boss.pos.clone().add(V(0, 0.3, 0)), ORANGE, 2, 7, 5); });
     if (ft > 8.2 && ft < 10.5) for (const p of postsXZ) if (Math.random() < 0.5) fx.juice(p.clone().multiplyScalar(0.94).setY(0.2), Math.random() < 0.5 ? LEMON : ORANGE, 2, 1.2, 12);
     S.player.yaw = Math.PI / 2 - 0.55 * (1 - ease((ft - 12) / 4)); S.boss.yaw = -Math.PI / 2 + 0.55 * (1 - ease((ft - 12) / 4)) - (ft > 5 && ft < 11 ? 0.3 : 0);
     zest.rotation.y = S.player.yaw; nar.rotation.y = S.boss.yaw;
@@ -173,14 +216,20 @@ export function createGame(world, sound, ui) {
 
   // ---------- combat helpers ----------
   const flatDist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
+  const toScreen = v => { const p = v.clone().project(camera); return { x: (p.x + 1) / 2 * innerWidth, y: (1 - p.y) / 2 * innerHeight, on: p.z < 1 }; };
+  const WORDS = { hit: ['PULP!', 'WHAP!', 'BONK!', 'SQUISH!', 'THUD!'], big: ['ZESTED!', 'SPLOOSH!', 'MEGA PULP!', 'KA-SQUISH!'] };
+  const pick = a => a[Math.floor(Math.random() * a.length)];
+  function popWord(word, at, kind) { const s = toScreen(at); if (s.on) ui.pop(word, s.x, s.y, kind); }
   function hitstop(s) { S.hitstop = Math.max(S.hitstop, s); }
   function shake(s) { S.shake = Math.max(S.shake, s); }
-  function hurtBoss(dmg, point, kind = 'hit') {
+  function hurtBoss(dmg, point, kind = 'hit', word = null) {
     const B = S.boss; if (B.state === 'roar' || B.state === 'dead' || B.state === 'intro') return false;
     if (B.state === 'stunned') dmg = Math.round(dmg * 1.5);
     B.hp = Math.max(0, B.hp - dmg); B.flash = 1; S.player.hits++;
     fx.juice(point, ORANGE, kind === 'heavy' ? 34 : 18, kind === 'heavy' ? 6 : 4.5, 5); fx.spark(point, kind === 'heavy' ? 2.4 : 1.6);
-    sound.sfx(kind === 'heavy' ? 'heavy' : 'hit'); sound.sfx('splash', 0.5); hitstop(kind === 'heavy' ? 0.11 : 0.065); shake(kind === 'heavy' ? 0.45 : 0.2);
+    sound.sfx(kind === 'heavy' ? 'heavy' : 'hit'); sound.sfx('splash', 0.5);
+    const big = kind === 'heavy' || kind === 'finisher' || B.state === 'stunned';
+    popWord(word || pick(big ? WORDS.big : WORDS.hit), point.clone().add(V(0, 0.6, 0)), big ? 'big' : 'hit'); hitstop(kind === 'heavy' ? 0.11 : 0.065); shake(kind === 'heavy' ? 0.45 : 0.2);
     ui.bossBar(B.hp / B.max, B.phase);
     if (B.hp <= 0) { setBoss('dead'); return true; }
     const nextPhase = B.hp / B.max <= 0.33 ? 3 : B.hp / B.max <= 0.66 ? 2 : 1;
@@ -194,6 +243,7 @@ export function createGame(world, sound, ui) {
     const away = V(P.pos.x - from.x, 0, P.pos.z - from.z).normalize(); P.vel.copy(away.multiplyScalar(knock)).setY(5); P.grounded = false;
     if (P.carry) { P.carry.state = 'fly'; P.carry.vel.set(0, 3, 0); P.carry = null; }
     fx.juice(P.pos.clone().add(V(0, 1.2, 0)), LEMON, 22, 4, 4); sound.sfx('hurt'); shake(0.4); hitstop(0.08);
+    popWord(pick(['OOF!', 'OUCH!', 'SOUR!']), P.pos.clone().add(V(0, 2.2, 0)), 'ouch');
     ui.playerBar(P.hp / 100);
     if (P.hp <= 0) { S.mode = 'lost'; S.endT = 0; sound.setMusic('lose'); sound.sfx('slam'); ui.hint(null); }
   }
@@ -203,7 +253,8 @@ export function createGame(world, sound, ui) {
     if (state === 'roar') { sound.sfx('roar'); shake(0.6); B.flash = 0;
       ui.banner(B.phase === 2 ? 'ROUND 2: PIP STORM' : 'FINAL ROUND: PULP SPLASH', B.phase === 2 ? 'He spits seeds now. Throw them back!' : 'Jump the shockwaves!');
       sound.setMusic(B.phase === 3 ? 'boss3' : 'battle'); }
-    if (state === 'dead') { sound.sfx('slam'); sound.sfx('splash'); shake(1); hitstop(0.25); S.mode = 'won'; S.endT = 0; sound.setMusic('win'); ui.hint(null);
+    if (state === 'dead') { sound.sfx('slam'); sound.sfx('splash'); shake(1); hitstop(0.25); S.mode = 'won'; S.endT = 0; S.slowmo = 1.8; S.orbit = null; sound.setMusic('win'); ui.hint(null);
+      fx.burst(B.pos.clone().add(V(0, 1.4, 0)), ORANGE, 1.5); popWord('K.O.!', B.pos.clone().add(V(0, 3.4, 0)), 'big');
       for (let i = 0; i < 6; i++) fx.juice(B.pos.clone().add(V(0, 1.6, 0)), ORANGE, 30, 8, 10); }
     if (state === 'stunned') { sound.sfx('stun'); }
   }
@@ -282,7 +333,8 @@ export function createGame(world, sound, ui) {
     zest.visible = P.iframes > 0 && !(a?.type === 'dodge') ? Math.floor(S.t * 20) % 2 === 0 : true;
     // hint
     const np = !P.carry && nearestProp();
-    ui.hint(P.carry ? `Throw the ${PROPS[P.carry.type].name.toLowerCase()} (E or click)` : np ? `Grab the ${PROPS[np.type].name.toLowerCase()} (E)` : null);
+    const tgt = P.carry ? P.carry.pos : np?.pos, sc = tgt && toScreen(tgt.clone().add(V(0, 0.7, 0)));
+    ui.hint(sc?.on ? { key: 'E', text: P.carry ? `throw ${PROPS[P.carry.type].name.toLowerCase()}` : `grab ${PROPS[np.type].name.toLowerCase()}`, x: sc.x, y: sc.y } : null);
   }
 
   // ---------- boss AI ----------
@@ -382,7 +434,7 @@ export function createGame(world, sound, ui) {
       else if (p.state === 'fly') {
         p.vel.y -= 22 * dt; p.pos.addScaledVector(p.vel, dt); p.mesh.rotation.x += p.spin.x * dt; p.mesh.rotation.z += p.spin.y * dt;
         if (p.thrown) { const c = B.pos.clone().add(V(0, 1.7, 0)); if (p.pos.distanceTo(c) < 1.35 + def.r) {
-          if (hurtBoss(def.dmg, p.pos.clone(), 'hit')) { if (def.stun && B.state !== 'dead' && B.state !== 'roar') setBoss('stunned'); if (def.slow) B.slow = def.slow;
+          if (hurtBoss(def.dmg, p.pos.clone(), 'hit', def.word)) { if (def.stun && B.state !== 'dead' && B.state !== 'roar') setBoss('stunned'); if (def.slow) B.slow = def.slow;
             if (def.juice) fx.juice(p.pos, def.juice, 14, 4, 3); if (p.type === 'ice' || p.type === 'sugar') fx.juice(p.pos, 0xffffff, 12, 4, 3); }
           p.vel.set(-p.vel.x * 0.25, 4, -p.vel.z * 0.25); p.thrown = false;
           if (p.type === 'berry' || p.type === 'seed') { scene.remove(p.mesh); S.props.splice(i, 1); continue; } } }
@@ -413,8 +465,16 @@ export function createGame(world, sound, ui) {
     camera.position.add(sh); camera.lookAt(S.camLook);
   }
 
+  // K.O.: slow-motion juice burst, then the camera circles a cheering Zest
+  function koCam(rdt) {
+    const P = S.player.pos; if (!S.orbit) S.orbit = { a: Math.atan2(camera.position.z - P.z, camera.position.x - P.x) };
+    S.orbit.a += rdt * 0.45; const r = 6.5, look = P.clone().add(V(0, 1.3, 0));
+    const want = V(P.x + Math.cos(S.orbit.a) * r, 2.4, P.z + Math.sin(S.orbit.a) * r);
+    camera.position.lerp(want, 1 - Math.exp(-3 * rdt)); S.camLook.lerp(look, 1 - Math.exp(-4 * rdt)); camera.lookAt(S.camLook);
+  }
   function update(rdt) {
     let dt = Math.min(rdt, 1 / 30);
+    if (S.slowmo > 0) { S.slowmo -= rdt; dt *= 0.25; }
     if (S.hitstop > 0) { S.hitstop -= rdt; dt = 0; }
     S.t += dt;
     if (S.mode === 'fight') { S.elapsed += dt; updatePlayer(dt); updateBoss(dt); updateProps(dt); }
@@ -425,14 +485,14 @@ export function createGame(world, sound, ui) {
       if (S.endT > 2.2 && !S.endShown) { S.endShown = true; ui.end(S.mode === 'won', { time: S.elapsed, hits: S.player.hits, hp: S.player.hp }); }
     }
     fx.update(dt, q => fx.splat(q.pos.x, q.pos.z, q.col.getHex(), 0.35 + Math.random() * 0.6));
-    updateCam(rdt);
+    if (S.mode === 'won' && S.endT > 0.6) koCam(rdt); else updateCam(rdt);
   }
 
   function startFight() {
     S.mode = 'fight'; S.elapsed = 0; S.boss.state = 'intro'; S.boss.st = 0; S.boss.cd = 1.8; S.endShown = false;
     ui.bossBar(1, 1); ui.playerBar(1); sound.setMusic('battle');
   }
-  function restart() { reset(); events.clear(); const c = gameCamIdeal(); camera.position.copy(c.pos); S.camLook.copy(c.look); startFight(); }
+  function restart() { reset(); events.clear(); paperToRig(99); const c = gameCamIdeal(); camera.position.copy(c.pos); S.camLook.copy(c.look); startFight(); }
 
   reset();
   return { S, input, press, filmUpdate, update, startFight, restart, reset: () => { reset(); events.clear(); } };

@@ -13,12 +13,22 @@ const ui = {
   bossBar(f) { $('#boss .fill').style.transform = `scaleX(${f})`; $('#boss .lag').style.transform = `scaleX(${f})`; },
   playerBar(f) { $('#me .fill').style.transform = `scaleX(${f})`; $('#me .lag').style.transform = `scaleX(${f})`; },
   banner(h, p = '') { const b = $('#banner .in'); b.querySelector('h2').textContent = h; b.querySelector('p').textContent = p; b.classList.remove('show'); void b.offsetWidth; b.classList.add('show'); },
-  hint(t) { const h = $('#hint'); if (t) h.textContent = t; h.style.opacity = t ? 1 : 0; },
+  // prompt pill that floats over the prop it refers to: h = { key, text, x, y } in CSS pixels, or null to hide
+  hint(h) { const el = $('#hint'); if (!h) { el.style.opacity = 0; return; }
+    const html = `<kbd>${h.key}</kbd>${h.text}`; if (el.dataset.html !== html) { el.dataset.html = html; el.innerHTML = html; }
+    el.style.left = h.x + 'px'; el.style.top = h.y + 'px'; el.style.opacity = 1; },
+  // comic hit word with a starburst at a screen point; kind: 'hit' | 'big' | 'ouch'
+  pop(word, x, y, kind = 'hit') {
+    const box = $('#hits'); if (box.children.length > 6) box.firstChild.remove();
+    const d = document.createElement('div'); d.className = 'hitw ' + kind; d.style.left = x + 'px'; d.style.top = y + 'px';
+    d.style.rotate = (Math.random() * 16 - 8) + 'deg';
+    d.innerHTML = '<div class="burst"></div><div class="burst i"></div><b class="comic"></b>'; d.querySelector('b').textContent = word;
+    box.appendChild(d); setTimeout(() => d.remove(), 800); },
   hud(on) { $('#hud').classList.toggle('on', on); },
   end(won, st) {
     const e = $('#end'); e.style.display = 'grid';
-    e.querySelector('h2').textContent = won ? 'K.O.!' : 'SQUEEZED!';
-    e.querySelector('h2').style.color = won ? 'var(--lemon)' : 'var(--orange)';
+    const h = e.querySelector('h2'); h.textContent = won ? 'K.O.!' : 'PULPED…'; h.classList.toggle('lose', !won);
+    h.style.animation = 'none'; void h.offsetWidth; h.style.animation = '';
     e.querySelector('p').textContent = won ? `Zest is the new champ. ${st.time.toFixed(1)} s, ${st.hits} hits landed, ${Math.round(st.hp)} HP left.` : `El Naranjo keeps the belt… for now. ${st.hits} hits landed.`;
   },
 };
@@ -37,8 +47,8 @@ const NARR = [
   [46.5, 'Only one fruit walks away unsqueezed.'],
   [52.5, 'Your move, Zest.'],
 ];
-const MUSIC = [[0, 'film1'], [22, 'film2'], [38, 'film3']];
-const T_3D = 36, T_FADE = [37.5, 40], T_ACT3 = 40, T_FIGHT = 60, T_SKIP = 55.6;
+const MUSIC = [[0, 'film1'], [22, 'film2'], [38, 'film3'], [51.43, 'lift']];   // lift = 4 bars at 112 BPM, landing on the FIGHT bell
+const T_3D = 36, T_FADE = [38.3, 39.7], T_ACT3 = 40, T_FIGHT = 60, T_SKIP = 55.6;
 
 let world, film, game, T = 0, phase = 'menu', last = performance.now(), fired = new Set(), frames = 0;
 const c2d = $('#c2d');
@@ -58,7 +68,7 @@ function start(at = 0) {
   const m = [...MUSIC].reverse().find(([t]) => t <= at); if (m) sound.setMusic(m[1]);
   $('#skip').style.display = 'block';
 }
-function skipToFight() { if (phase !== 'film') return; if (T < T_SKIP) { for (const [t] of NARR) if (t < T_SKIP) fired.add('n' + t); T = T_SKIP; sound.setMusic('film3'); speechSynthesis?.cancel(); } }
+function skipToFight() { if (phase !== 'film') return; if (T < T_SKIP) { for (const [t] of NARR) if (t < T_SKIP) fired.add('n' + t); T = T_SKIP; sound.setMusic('lift'); speechSynthesis?.cancel(); } }
 function beginFight() {
   phase = 'fight'; $('#skip').style.display = 'none'; c2d.style.display = 'none';
   game.startFight(); ui.hud(true); setTimeout(() => $('#keys').style.opacity = 0.0, 14000);

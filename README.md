@@ -16,4 +16,4 @@ python3 -m http.server 8000           # any static server works, e.g. npx serve
 - Click inside the page before using the keys. Controls: WASD move, Space jump, click/J punch, right-click/K spin, Shift dodge, E grab/throw.
 - Online version: https://claude.ai/artifact/AXPEtbGtLBwok1SAHCgJdR (private to the owner until shared).
 - Version 1.5 takes its look and music feel from a private reference clip; see [REFERENCE-NOTES.md](REFERENCE-NOTES.md). Video files are git-ignored and must not be committed.
-- `dist/` holds the exact files published as the artifact (still v1 until it is republished). Rebuild it with `python3 tools/build-artifact.py`.
+- `dist/` holds the exact files published as the artifact. Rebuild it with `python3 tools/build-artifact.py`.
