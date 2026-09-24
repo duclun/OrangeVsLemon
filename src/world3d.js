@@ -306,6 +306,7 @@ export class FX {
     this.splats = []; this.splatGeo = new THREE.PlaneGeometry(1, 1);
     // shockwaves + telegraphs
     this.rings = [];
+    this.blobs = [];
     // impact sparks
     const starTex = canvasTex(128, 128, (c, w, h) => { c.translate(64, 64); c.fillStyle = '#fff';
       c.beginPath(); for (let i = 0; i < 16; i++) { const r = i % 2 ? 18 : 60, a = i / 16 * Math.PI * 2; c.lineTo(Math.cos(a) * r, Math.sin(a) * r); } c.fill(); });
@@ -324,6 +325,16 @@ export class FX {
     m.scale.setScalar(0.01); m.receiveShadow = true; this.scene.add(m); this.splats.push(m);
     if (this.splats.length > 160) { const old = this.splats.shift(); this.scene.remove(old); old.material.dispose(); }
   }
+  // v1.5 hero splash: a cluster of glossy juice blobs that swell, wobble and burst into droplets and floor splats.
+  burst(pos, color, scale = 1) {
+    this.blobGeo ??= new THREE.IcosahedronGeometry(1, 3);
+    const mat = new THREE.MeshPhysicalMaterial({ color, roughness: 0.08, clearcoat: 1, clearcoatRoughness: 0.05, sheen: 0.4, emissive: color, emissiveIntensity: 0.12 });
+    for (let i = 0; i < 18; i++) {
+      const m = new THREE.Mesh(this.blobGeo, mat), d = new THREE.Vector3().randomDirection().multiplyScalar((0.3 + Math.random()) * 1.3 * scale);
+      d.y = Math.abs(d.y) * 1.3 + 0.3 * scale; m.position.copy(pos).add(d); m.scale.setScalar(0.001); m.castShadow = true; this.scene.add(m);
+      this.blobs.push({ m, t: -i * 0.012, r: (0.22 + Math.random() * 0.3) * scale, vel: d.clone().multiplyScalar(1.6), color, popped: false, ph: Math.random() * 6 });
+    }
+  }
   spark(pos, size = 1.4) { const s = this.sparks.find(s => s.userData.t >= 1) || this.sparks[0]; s.position.copy(pos); s.userData.t = 0; s.userData.size = size; s.visible = true; s.material.rotation = Math.random() * 6; }
   ring(pos, { color = 0xff8f24, speed = 10, max = ARENA_R + 1, width = 0.6, telegraph = false, life = 1 } = {}) {
     const m = new THREE.Mesh(new THREE.RingGeometry(0.9, 1, 64), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: telegraph ? 0.5 : 0.9, side: THREE.DoubleSide, depthWrite: false }));
@@ -341,6 +352,12 @@ export class FX {
     this.parts.instanceMatrix.needsUpdate = true; this.parts.instanceColor.needsUpdate = true;
     for (const s of this.splats) { const u = s.userData; if (u.t < 1) { u.t = Math.min(1, u.t + dt * 5); s.scale.setScalar(u.target * (1 - Math.pow(1 - u.t, 3))); } }
     for (const s of this.sparks) { if (s.userData.t >= 1) continue; s.userData.t += dt * 6; const k = s.userData.t; s.scale.setScalar(s.userData.size * (0.5 + k)); s.material.opacity = 1 - k; if (k >= 1) s.visible = false; }
+    for (let i = this.blobs.length - 1; i >= 0; i--) { const b = this.blobs[i]; b.t += dt; if (b.t < 0) continue;
+      const k = b.t / 0.95, grow = k < 0.2 ? 1 - Math.pow(1 - k / 0.2, 3) : 1, shrink = k > 0.55 ? Math.max(0, 1 - (k - 0.55) / 0.45) : 1;
+      b.m.position.addScaledVector(b.vel, dt * (1 - k)); const w = 1 + Math.sin(b.t * 22 + b.ph) * 0.12 * shrink;
+      b.m.scale.set(b.r * grow * shrink * w, b.r * grow * shrink / w, b.r * grow * shrink * w);
+      if (k > 0.55 && !b.popped) { b.popped = true; this.juice(b.m.position, b.color, 6, 5, 4); this.splat(b.m.position.x + (Math.random() - 0.5) * 2, b.m.position.z + (Math.random() - 0.5) * 2, b.color, 1.2 + b.r * 2); }
+      if (k >= 1) { this.scene.remove(b.m); this.blobs.splice(i, 1); } }
     for (let i = this.rings.length - 1; i >= 0; i--) { const r = this.rings[i]; r.t += dt;
       if (r.telegraph) { const k = Math.min(1, r.t / r.life); r.mesh.scale.setScalar(r.max * k); r.mesh.material.opacity = 0.3 + 0.4 * Math.abs(Math.sin(r.t * 14)); }
       else { r.r += r.speed * dt; r.mesh.scale.setScalar(r.r); r.mesh.material.opacity = 0.9 * (1 - r.r / r.max); }

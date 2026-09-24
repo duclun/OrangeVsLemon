@@ -86,7 +86,7 @@ export function createGame(world, sound, ui) {
       mode: 'film', t: 0, hitstop: 0, shake: 0, camLook: V(0, 1.4, 0), camDir: V(-1, 0, 0), elapsed: 0,
       player: { pos: V(-3, 0, 0), vel: V(), yaw: Math.PI / 2, hp: 100, grounded: true, action: null, combo: 0, comboT: 0, iframes: 0, dodgeCd: 0, carry: null, hits: 0, flash: 0, runPh: 0 },
       boss: { pos: V(3.5, 0, 0), vel: V(), yaw: -Math.PI / 2, hp: 420, max: 420, state: 'intro', st: 0, cd: 1.6, phase: 1, chargeDir: V(), bounces: 0, flash: 0, stun: 0, slow: 0, leapFrom: V(), target: V(), volleys: 0, telegraph: null, shock: null, walkPh: 0 },
-      props: [], proj: [], dropT: 0,
+      props: [], proj: [], dropT: 0, slowmo: 0, orbit: null,
     });
     const types = ['sugar', 'sugar', 'bean', 'bean', 'berry', 'berry', 'ice', 'sugar'];
     types.forEach((ty, i) => { const a = i / types.length * Math.PI * 2 + 0.3, r = 6 + (i % 3) * 1.8; spawnProp(ty, V(Math.cos(a) * r, 0, Math.sin(a) * r)); });
@@ -199,7 +199,7 @@ export function createGame(world, sound, ui) {
     S.t += dt;
     paperToRig(ft);
     once('roar', ft >= 6, () => { sound.sfx('roar'); S.shake = 0.35; });
-    once('slam', ft >= 8.2, () => { sound.sfx('slam'); S.shake = 0.8; fx.ring(S.boss.pos, { speed: 14 }); for (let i = 0; i < 20; i++) fx.juice(S.boss.pos.clone().add(V(0, 0.3, 0)), ORANGE, 2, 7, 5); });
+    once('slam', ft >= 8.2, () => { sound.sfx('slam'); sound.sfx('splash'); S.shake = 0.8; fx.ring(S.boss.pos, { speed: 14 }); fx.burst(S.boss.pos.clone().setY(0.2), ORANGE, 1.1); for (let i = 0; i < 20; i++) fx.juice(S.boss.pos.clone().add(V(0, 0.3, 0)), ORANGE, 2, 7, 5); });
     if (ft > 8.2 && ft < 10.5) for (const p of postsXZ) if (Math.random() < 0.5) fx.juice(p.clone().multiplyScalar(0.94).setY(0.2), Math.random() < 0.5 ? LEMON : ORANGE, 2, 1.2, 12);
     S.player.yaw = Math.PI / 2 - 0.55 * (1 - ease((ft - 12) / 4)); S.boss.yaw = -Math.PI / 2 + 0.55 * (1 - ease((ft - 12) / 4)) - (ft > 5 && ft < 11 ? 0.3 : 0);
     zest.rotation.y = S.player.yaw; nar.rotation.y = S.boss.yaw;
@@ -253,7 +253,8 @@ export function createGame(world, sound, ui) {
     if (state === 'roar') { sound.sfx('roar'); shake(0.6); B.flash = 0;
       ui.banner(B.phase === 2 ? 'ROUND 2: PIP STORM' : 'FINAL ROUND: PULP SPLASH', B.phase === 2 ? 'He spits seeds now. Throw them back!' : 'Jump the shockwaves!');
       sound.setMusic(B.phase === 3 ? 'boss3' : 'battle'); }
-    if (state === 'dead') { sound.sfx('slam'); sound.sfx('splash'); shake(1); hitstop(0.25); S.mode = 'won'; S.endT = 0; sound.setMusic('win'); ui.hint(null);
+    if (state === 'dead') { sound.sfx('slam'); sound.sfx('splash'); shake(1); hitstop(0.25); S.mode = 'won'; S.endT = 0; S.slowmo = 1.8; S.orbit = null; sound.setMusic('win'); ui.hint(null);
+      fx.burst(B.pos.clone().add(V(0, 1.4, 0)), ORANGE, 1.5); popWord('K.O.!', B.pos.clone().add(V(0, 3.4, 0)), 'big');
       for (let i = 0; i < 6; i++) fx.juice(B.pos.clone().add(V(0, 1.6, 0)), ORANGE, 30, 8, 10); }
     if (state === 'stunned') { sound.sfx('stun'); }
   }
@@ -464,8 +465,16 @@ export function createGame(world, sound, ui) {
     camera.position.add(sh); camera.lookAt(S.camLook);
   }
 
+  // K.O.: slow-motion juice burst, then the camera circles a cheering Zest
+  function koCam(rdt) {
+    const P = S.player.pos; if (!S.orbit) S.orbit = { a: Math.atan2(camera.position.z - P.z, camera.position.x - P.x) };
+    S.orbit.a += rdt * 0.45; const r = 6.5, look = P.clone().add(V(0, 1.3, 0));
+    const want = V(P.x + Math.cos(S.orbit.a) * r, 2.4, P.z + Math.sin(S.orbit.a) * r);
+    camera.position.lerp(want, 1 - Math.exp(-3 * rdt)); S.camLook.lerp(look, 1 - Math.exp(-4 * rdt)); camera.lookAt(S.camLook);
+  }
   function update(rdt) {
     let dt = Math.min(rdt, 1 / 30);
+    if (S.slowmo > 0) { S.slowmo -= rdt; dt *= 0.25; }
     if (S.hitstop > 0) { S.hitstop -= rdt; dt = 0; }
     S.t += dt;
     if (S.mode === 'fight') { S.elapsed += dt; updatePlayer(dt); updateBoss(dt); updateProps(dt); }
@@ -476,7 +485,7 @@ export function createGame(world, sound, ui) {
       if (S.endT > 2.2 && !S.endShown) { S.endShown = true; ui.end(S.mode === 'won', { time: S.elapsed, hits: S.player.hits, hp: S.player.hp }); }
     }
     fx.update(dt, q => fx.splat(q.pos.x, q.pos.z, q.col.getHex(), 0.35 + Math.random() * 0.6));
-    updateCam(rdt);
+    if (S.mode === 'won' && S.endT > 0.6) koCam(rdt); else updateCam(rdt);
   }
 
   function startFight() {
