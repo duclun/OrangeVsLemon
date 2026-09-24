@@ -89,7 +89,9 @@ const keys = {};
 const KEYMAP = { Space: 'jump', KeyJ: 'light', KeyK: 'heavy', ShiftLeft: 'dodge', ShiftRight: 'dodge', KeyL: 'dodge', KeyE: 'grab' };
 function syncMove() { if (!game) return; game.input.mx = (keys.KeyD || keys.ArrowRight ? 1 : 0) - (keys.KeyA || keys.ArrowLeft ? 1 : 0); game.input.my = (keys.KeyW || keys.ArrowUp ? 1 : 0) - (keys.KeyS || keys.ArrowDown ? 1 : 0); }
 addEventListener('keydown', e => {
-  if (e.repeat) return; keys[e.code] = true; syncMove(); if (paused) setPaused(false);
+  if (e.repeat) return; keys[e.code] = true; syncMove();
+  if (e.code === 'Escape') { togglePause(); return; }
+  if (paused) setPaused(false);
   if (KEYMAP[e.code] && phase === 'fight') { game.press(KEYMAP[e.code]); e.preventDefault(); }
   if (e.code === 'Enter') { if (phase === 'menu') start(); else skipToFight(); }
   if (e.code === 'KeyM') toggleMute();
