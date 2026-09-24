@@ -6,6 +6,8 @@ This is the lead's running handoff. If you are picking this up, follow the visio
 A roughly 60-second film on a kitchen counter at sunset. Zest, a small, stubborn lemon, challenges El Naranjo, a loud luchador orange who is the reigning champion. The film starts as **flat cut-paper 2D**, deepens into **2.5D parallax paper layers**, then opens into **outlined toon-shaded 3D**. The final camera move settles behind Zest and becomes a **playable boss fight** with no cut, set in a tiled kitchen with a wooden-counter ring. It should feel warm, handmade, funny and juicy.
 
 ## v1.5: reference-inspired look (current work)
+**Branch:** v1.5 work continues on `build/v1.5` (branched from `build/playable-v1` at the v1.5 publish). `build/playable-v1` / PR #1 also contains the v1.5 commits up to that point.
+
 Alan asked for v1.5 to take its look, music feel and aesthetics from a reference clip on his machine (`orangevslemon-ref.mp4`, another creator's model test). **The clip is reference only: it is git-ignored and must never be committed, and no frames, audio, melodies, character designs or names from it are reused.** What was learned is written up in our own words in [REFERENCE-NOTES.md](REFERENCE-NOTES.md).
 
 What v1.5 changed (all original, made in code):
