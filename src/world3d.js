@@ -12,7 +12,7 @@ const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
 
 // ---------- shared materials ----------
 const toonRamp = (() => {
-  const t = new THREE.DataTexture(new Uint8Array([70, 140, 200, 255]), 4, 1, THREE.RedFormat);
+  const t = new THREE.DataTexture(new Uint8Array([115, 175, 225, 255]), 4, 1, THREE.RedFormat);
   t.minFilter = t.magFilter = THREE.NearestFilter; t.needsUpdate = true; return t;
 })();
 export const inkMat = new THREE.MeshBasicMaterial({ color: INK, side: THREE.BackSide });
@@ -353,7 +353,7 @@ export function createWorld(canvas) {
   const fx = new FX(scene);
   const composer = new EffectComposer(renderer);
   composer.addPass(new RenderPass(scene, camera));
-  const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.25, 0.5, 0.95); composer.addPass(bloom);
+  const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.18, 0.45, 0.97); composer.addPass(bloom);
   composer.addPass(new OutputPass());
   addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); });
   return { THREE, renderer, scene, camera, fx, composer, render: () => composer.render() };

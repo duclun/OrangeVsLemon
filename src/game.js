@@ -265,6 +265,7 @@ export function createGame(world, sound, ui) {
     const hs = Math.hypot(P.vel.x, P.vel.z);
     if (a && (a.type === 'light' || a.type === 'heavy' || a.type === 'throw') && dist < 9) P.yaw = angDamp(P.yaw, yawTo(toB), 25, dt);
     else if (hs > 0.5) P.yaw = angDamp(P.yaw, Math.atan2(P.vel.x, P.vel.z), 14, dt);
+    else if (!a && dist < 16) P.yaw = angDamp(P.yaw, yawTo(toB), 6, dt); // square up to the boss when standing still
     P.runPh += hs * dt * 2.2;
     // kick props by running into them
     for (const p of S.props) if (p.state === 'rest' && flatDist(p.pos, P.pos) < 0.7 && hs > 3) { p.state = 'fly'; p.vel.set(P.vel.x * 0.9, 3, P.vel.z * 0.9); }
