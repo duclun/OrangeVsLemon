@@ -47,7 +47,7 @@ const NARR = [
   [46.5, 'Only one fruit walks away unsqueezed.'],
   [52.5, 'Your move, Zest.'],
 ];
-const MUSIC = [[0, 'film1'], [22, 'film2'], [38, 'film3']];
+const MUSIC = [[0, 'film1'], [22, 'film2'], [38, 'film3'], [51.43, 'lift']];   // lift = 4 bars at 112 BPM, landing on the FIGHT bell
 const T_3D = 36, T_FADE = [38.3, 39.7], T_ACT3 = 40, T_FIGHT = 60, T_SKIP = 55.6;
 
 let world, film, game, T = 0, phase = 'menu', last = performance.now(), fired = new Set(), frames = 0;
@@ -68,7 +68,7 @@ function start(at = 0) {
   const m = [...MUSIC].reverse().find(([t]) => t <= at); if (m) sound.setMusic(m[1]);
   $('#skip').style.display = 'block';
 }
-function skipToFight() { if (phase !== 'film') return; if (T < T_SKIP) { for (const [t] of NARR) if (t < T_SKIP) fired.add('n' + t); T = T_SKIP; sound.setMusic('film3'); speechSynthesis?.cancel(); } }
+function skipToFight() { if (phase !== 'film') return; if (T < T_SKIP) { for (const [t] of NARR) if (t < T_SKIP) fired.add('n' + t); T = T_SKIP; sound.setMusic('lift'); speechSynthesis?.cancel(); } }
 function beginFight() {
   phase = 'fight'; $('#skip').style.display = 'none'; c2d.style.display = 'none';
   game.startFight(); ui.hud(true); setTimeout(() => $('#keys').style.opacity = 0.0, 14000);

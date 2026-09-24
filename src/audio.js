@@ -1,5 +1,15 @@
 // All sound is synthesized live with Web Audio: music sequencer, SFX, and narration via speech synthesis.
 
+// Original melodies for v1.5: [step in a 4-bar phrase, semitones above A3, length in steps].
+const TUNE_A = [[0, 7, 2], [2, 4, 2], [4, 0, 2], [8, 2, 1], [9, 4, 1], [10, 7, 4], [16, 9, 2], [18, 7, 2], [20, 4, 4], [26, 2, 2],
+  [32, 2, 2], [34, 5, 2], [36, 9, 2], [40, 14, 3], [43, 12, 1], [44, 9, 4], [48, 11, 2], [50, 7, 2], [52, 4, 2], [54, 2, 2], [56, -1, 6]];
+const TUNE_B = [[0, 9, 2], [6, 12, 2], [12, 16, 2], [16, 14, 2], [22, 12, 2], [28, 9, 2], [32, 12, 2], [38, 16, 2], [44, 19, 2], [48, 16, 2], [54, 14, 2], [60, 11, 2]];
+const TUNE_C = [[0, 9, 3], [3, 12, 3], [6, 16, 2], [8, 14, 2], [10, 12, 2], [12, 9, 4], [16, 17, 3], [19, 16, 3], [22, 14, 2], [24, 12, 4], [28, 14, 4],
+  [32, 19, 3], [35, 16, 3], [38, 11, 2], [40, 14, 2], [42, 16, 2], [44, 19, 4], [48, 20, 4], [52, 16, 4], [56, 11, 4], [60, 8, 4]];
+
+// Loudness trims so the quiet film sections sit closer to the battle theme (measured with tools/render-music.mjs).
+const TRIM = { film1: 2.2, film2: 2.6, film3: 1.3, lift: 1.1, battle: 1, boss3: 1, win: 1.2, lose: 2.6 };
+
 export class Sound {
   constructor() { this.ctx = null; this.mode = null; this.step = 0; this.nextT = 0; this.voice = null; this.muted = false; }
 
@@ -11,7 +21,8 @@ export class Sound {
     this.master = c.createGain(); this.master.gain.value = 0.8;
     const comp = c.createDynamicsCompressor(); comp.threshold.value = -14; comp.ratio.value = 4;
     this.master.connect(comp).connect(c.destination);
-    this.music = c.createGain(); this.music.gain.value = 0.42; this.music.connect(this.master);
+    this.music = c.createGain(); this.music.gain.value = 0.42;
+    this.trim = c.createGain(); this.music.connect(this.trim).connect(this.master);   // per-section level trim (see TRIM)
     this.sfxBus = c.createGain(); this.sfxBus.gain.value = 0.9; this.sfxBus.connect(this.master);
     // small room reverb
     const len = c.sampleRate * 1.6, ir = c.createBuffer(2, len, c.sampleRate);
@@ -29,53 +40,116 @@ export class Sound {
 
   setMute(m) { this.muted = m; if (this.master) this.master.gain.value = m ? 0 : 0.8; if (m && 'speechSynthesis' in window) speechSynthesis.cancel(); }
 
-  // ---- music ----
-  setMusic(mode) { this.mode = mode; }
+  // ---- music (v1.5 score, all original) ----
+  // Arc: playful A-major marimba (film1) -> warm F#-minor strings (film2) -> swelling timpani and arps (film3)
+  // -> 4-bar dominant lift into the FIGHT bell (lift) -> driving F#-minor battle theme (battle, boss3 up a semitone).
+  setMusic(mode) { if (mode !== this.mode) { this.mode = mode; this.step = 0; if (this.trim) this.trim.gain.setTargetAtTime(TRIM[mode] ?? 1, this.ctx.currentTime, 0.3); } }
   schedule() {
     const c = this.ctx; if (!c) return;
     while (this.nextT < c.currentTime + 0.15) { if (this.mode) this.playStep(this.step, this.nextT); this.nextT += this.stepDur(); this.step++; }
   }
-  stepDur() { const bpm = { film1: 118, film2: 112, film3: 96, battle: 148, boss3: 164, win: 120, lose: 80 }[this.mode] || 120; return 60 / bpm / 4; }
+  stepDur() { const bpm = { film1: 104, film2: 96, film3: 112, lift: 112, battle: 150, boss3: 162, win: 126, lose: 70 }[this.mode] || 120; return 60 / bpm / 4; }
   playStep(s, t) {
-    const m = this.mode, bar = Math.floor(s / 16) % 4, st = s % 16;
-    const roots = m === 'win' ? [48, 53, 55, 48] : [50, 46, 53, 48];      // Dm Bb F C  (win: C F G C)
-    const quals = m === 'win' ? [[0, 4, 7], [0, 4, 7], [0, 4, 7], [0, 4, 7]] : [[0, 3, 7], [0, 4, 7], [0, 4, 7], [0, 4, 7]];
-    const root = roots[bar], q = quals[bar];
+    const m = this.mode, bar = Math.floor(s / 16), b4 = bar % 4, st = s % 16, sd = this.stepDur();
     const f = n => 440 * Math.pow(2, (n - 69) / 12);
-    if (m === 'lose') { if (st === 0 && bar % 2 === 0) this.pad(f(root), t, 2.4, 0.08); if (st === 0) this.pluck(f(root + 12 + q[s % 3]), t, 0.5, 0.1); return; }
-    if (m === 'film1') { // pizzicato cartoon
-      if (st % 4 === 0) this.pluck(f(root - 12), t, 0.25, 0.22);
-      if ([2, 6, 10, 14].includes(st)) this.pluck(f(root + q[(st >> 1) % 3]), t, 0.15, 0.13);
-      if (st === 7 || st === 15) this.pluck(f(root + 12 + q[st % 3]), t, 0.12, 0.08, 'square');
-      if (st % 8 === 4) this.hat(t, 0.04);
+    const MAJ = [0, 4, 7], MIN = [0, 3, 7];
+    // chord tables: [root midi, triad]
+    const PROG = {
+      film1: [[57, MAJ], [54, MIN], [59, MIN], [52, MAJ]],          // A  F#m  Bm  E
+      film2: [[54, MIN], [50, MAJ], [57, MAJ], [52, MAJ]],          // F#m D   A   E
+      film3: [[54, MIN], [50, MAJ], [57, MAJ], [52, MAJ]],
+      lift: [[52, MAJ], [52, MAJ], [52, MAJ], [52, MAJ]],           // E pedal (dominant of A)
+      battle: [[54, MIN], [50, MAJ], [52, MAJ], [49, MAJ]],         // F#m D   E   C#
+      boss3: [[55, MIN], [51, MAJ], [53, MAJ], [50, MAJ]],          // same, a semitone up
+      win: [[57, MAJ], [50, MAJ], [52, MAJ], [57, MAJ]],            // A  D   E   A
+      lose: [[54, MIN], [52, MAJ], [50, MAJ], [49, MAJ]],           // F#m E  D   C#
+    }[m];
+    const [root, q] = PROG[b4];
+    const tone = i => root + q[((i % 3) + 3) % 3] + 12 * Math.floor(i / 3);   // i-th chord tone going up
+
+    if (m === 'lose') {
+      if (st === 0) this.pad(f(root), t, sd * 16, 0.07, q);
+      if (st % 4 === 0) this.marimba(f(tone(6 - st / 4)), t, 0.1);
       return;
     }
-    if (st === 0) this.pad(f(root), t, this.stepDur() * 16, m === 'film3' ? 0.09 : 0.06, q);
-    if (m === 'film2') {
-      if (st % 4 === 0) this.bass(f(root - 12), t, 0.3, 0.2);
-      if (st % 3 === 0) this.pluck(f(root + 12 + q[(s / 3 | 0) % 3]), t, 0.2, 0.08);
-      if (st % 4 === 2) this.hat(t, 0.04);
+    if (m === 'film1') { // playful: marimba arpeggios, plucked bass, a whistled tune every other phrase
+      if (st === 0 || st === 8) this.pizz(f(root - 12), t, 0.22); if (st === 6 || st === 14) this.pizz(f(root - 5), t, 0.14);
+      const arp = [0, 1, 2, 3, 2, 1, 2, 4];
+      if (st % 2 === 0) this.marimba(f(tone(arp[(st / 2) % 8]) + 12), t, st % 4 === 0 ? 0.13 : 0.09);
+      if (st % 4 === 2) this.tick(t, 0.035);
+      if (Math.floor(bar / 4) % 2 === 1) this.tune(s % 64, t, TUNE_A, 12);
       return;
     }
-    if (m === 'film3') {
-      if (st === 0 || st === 10) this.kick(t, 0.6);
-      if (st % 8 === 4) this.boom(t, 0.25);
-      if (st % 2 === 0) this.pluck(f(root + 24 + q[(s / 2 | 0) % 3]), t, 0.18, 0.05);
+    if (m === 'film2') { // warmer: string pad, soft pulse bass, glockenspiel counter-line
+      if (st === 0) this.pad(f(root), t, sd * 16, 0.07, q);
+      if (st % 4 === 0) this.bass(f(root - 12), t, 0.35, 0.14);
+      if (st % 4 === 2) this.tick(t, 0.03);
+      if (st % 2 === 0) this.marimba(f(tone([0, 2, 1, 2, 3, 2, 1, 2][(st / 2) % 8]) + 12), t, 0.06);
+      this.tune(s % 64, t, TUNE_B, 24, 'glock');
       return;
     }
-    // battle / boss3
+    if (m === 'film3') { // swell: timpani, 16th-note string arps, kick on 1 and 3
+      if (st === 0) { this.pad(f(root), t, sd * 16, 0.1, q); this.timpani(f(root - 24), t, 0.5); }
+      if (st === 8) this.timpani(f(root - 17), t, 0.3);
+      if (st === 0 || st === 8) this.kick(t, 0.45);
+      this.pizz(f(tone([0, 1, 2, 3, 4, 3, 2, 1][st % 8]) + 12), t, 0.05 + 0.02 * (bar % 8) / 8);
+      if (st % 4 === 2) this.tick(t, 0.04);
+      return;
+    }
+    if (m === 'lift') { // 4 bars on E: rising arpeggio and a snare roll that tightens into the bell
+      const k = Math.min(1, s / 64);
+      if (st === 0) { this.pad(f(52), t, sd * 16, 0.08 + 0.05 * k, [0, 7, 12]); this.timpani(f(28), t, 0.5); }
+      const every = bar === 0 ? 4 : bar === 1 ? 2 : 1;
+      if (st % every === 0) this.snare(t, 0.08 + 0.22 * k);
+      if (st % 4 === 0) this.kick(t, 0.4 + 0.3 * k);
+      this.pizz(f(52 + [0, 4, 7, 11, 12, 16, 19, 23][Math.floor(s / 2) % 8] + 12 * Math.min(1, bar >> 1)), t, 0.05 + 0.05 * k);
+      return;
+    }
+    if (m === 'win') { // fanfare: brass on the downbeats, glock arpeggios, claps
+      if (st === 0) { this.pad(f(root), t, sd * 16, 0.08, q); this.brass(f(tone(3)), t, sd * 6, 0.12); }
+      if (st === 6 || st === 10) this.brass(f(tone(4)), t, sd * 2, 0.08);
+      if (st % 2 === 0) this.glock(f(tone(st / 2 % 6) + 12), t, 0.05);
+      if (st % 4 === 0) this.kick(t, 0.6); if (st % 8 === 4) this.clap(t, 0.25);
+      return;
+    }
+    // battle / boss3: four-on-the-floor with a skip, claps on 2 and 4, octave bass, marimba riff, brass stabs, whistled hook
     const hot = m === 'boss3';
-    if (st % 4 === 0 || (hot && st === 14)) this.kick(t, 0.8);
-    if (st % 8 === 4) this.snare(t, 0.35);
-    if (st % 2 === 1) this.hat(t, 0.05);
-    const bl = [0, 0, 12, 0, 7, 0, 12, 10];
-    if (st % 2 === 0) this.bass(f(root - 12 + bl[(st >> 1) % 8]), t, 0.12, 0.22);
-    const arp = [0, 1, 2, 1, 2, 0, 2, 1];
-    if (hot || st % 2 === 0) this.pluck(f(root + 12 + q[arp[st % 8]] + (st >= 8 ? 12 : 0)), t, 0.1, hot ? 0.06 : 0.07, 'square');
-    if (st === 0 && bar % 2 === 0) this.lead(f(root + 24 + q[bar % 3]), t, this.stepDur() * 6, 0.05);
+    if (st % 4 === 0 || st === 11 || (hot && st === 14)) this.kick(t, st === 11 ? 0.5 : 0.8);
+    if (st === 4 || st === 12) { this.clap(t, 0.3); this.snare(t, 0.12); }
+    if (st % 2 === 1 || hot) this.tick(t, st % 4 === 2 ? 0.06 : 0.035);
+    if (st % 2 === 0) this.bass(f(root - 12 + (st % 4 === 2 ? 12 : 0)), t, 0.11, 0.2);
+    const riff = [0, -1, 2, -1, 1, 2, -1, 3, 0, -1, 2, -1, 4, 3, 2, -1];
+    if (riff[st] >= 0) this.marimba(f(tone(riff[st]) + 12), t, hot ? 0.1 : 0.08);
+    if ((st === 3 || st === 10) && b4 % 2 === 1) this.brass(f(tone(1) + 12), t, sd * 1.5, 0.07);
+    if (Math.floor(bar / 4) % 2 === 1 || hot) this.tune(s % 64, t, TUNE_C, hot ? 13 : 12);
+  }
+  // Play the note of a melody that starts on this step. Melodies are [step, semitones above A3, length in steps] over 4 bars.
+  tune(s64, t, notes, shift = 12, voice = 'whistle') {
+    for (const [at, n, len] of notes) if (at === s64) {
+      const fr = 440 * Math.pow(2, (57 + n + shift - 69) / 12), d = len * this.stepDur();
+      if (voice === 'glock') this.glock(fr, t, 0.05); else this.whistle(fr, t, d, 0.06);
+    }
   }
 
   // ---- instruments ----
+  marimba(fr, t, v) { this.osc('sine', fr, t, 0.35, v); this.osc('sine', fr * 4, t, 0.06, v * 0.35); this.osc('triangle', fr * 2, t, 0.12, v * 0.2); }
+  pizz(fr, t, v) { const c = this.ctx, o = c.createOscillator(), fl = c.createBiquadFilter(), g = c.createGain();
+    o.type = 'sawtooth'; o.frequency.value = fr; fl.type = 'lowpass'; fl.frequency.setValueAtTime(fr * 6, t); fl.frequency.exponentialRampToValueAtTime(fr * 1.2, t + 0.12);
+    g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.22); o.connect(fl).connect(g).connect(this.music); o.start(t); o.stop(t + 0.3); }
+  glock(fr, t, v) { this.osc('sine', fr, t, 0.9, v); this.osc('sine', fr * 2.76, t, 0.25, v * 0.4); const { g } = this.osc('sine', fr, t, 0.9, v * 0.5, this.verb); }
+  whistle(fr, t, d, v) { const c = this.ctx, o = c.createOscillator(), g = c.createGain(), lfo = c.createOscillator(), lg = c.createGain();
+    o.type = 'sine'; o.frequency.setValueAtTime(fr * 0.97, t); o.frequency.exponentialRampToValueAtTime(fr, t + 0.04);
+    lfo.frequency.value = 5.5; lg.gain.setValueAtTime(0, t); lg.gain.linearRampToValueAtTime(fr * 0.012, t + Math.min(0.25, d)); lfo.connect(lg).connect(o.frequency);
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(v, t + 0.03); g.gain.setValueAtTime(v, t + Math.max(0.04, d - 0.05)); g.gain.linearRampToValueAtTime(0, t + d + 0.08);
+    o.connect(g); g.connect(this.music); g.connect(this.verb); o.start(t); lfo.start(t); o.stop(t + d + 0.1); lfo.stop(t + d + 0.1); }
+  brass(fr, t, d, v) { for (const det of [-9, 9]) { const c = this.ctx, o = c.createOscillator(), fl = c.createBiquadFilter(), g = c.createGain();
+    o.type = 'sawtooth'; o.frequency.value = fr; o.detune.value = det; fl.type = 'lowpass'; fl.Q.value = 2;
+    fl.frequency.setValueAtTime(400, t); fl.frequency.linearRampToValueAtTime(2600, t + 0.05); fl.frequency.exponentialRampToValueAtTime(900, t + d);
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(v, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + d + 0.08);
+    o.connect(fl).connect(g); g.connect(this.music); o.start(t); o.stop(t + d + 0.1); } }
+  timpani(fr, t, v) { const { o } = this.osc('sine', fr * 1.5, t, 1.2, v); o.frequency.exponentialRampToValueAtTime(fr, t + 0.08); this.noiseHit(t, 0.25, v * 0.25, 'lowpass', 300); }
+  clap(t, v) { for (let i = 0; i < 3; i++) this.noiseHit(t + i * 0.011, 0.09, v, 'bandpass', 1300, 1.2); this.noiseHit(t + 0.03, 0.2, v * 0.4, 'bandpass', 1100, 0.8, this.verb); }
+  tick(t, v) { this.noiseHit(t, 0.03, v, 'highpass', 8000); }
   osc(type, freq, t, dur, vol, dest = this.music, attack = 0.005) {
     const c = this.ctx, o = c.createOscillator(), g = c.createGain();
     o.type = type; o.frequency.value = freq;
