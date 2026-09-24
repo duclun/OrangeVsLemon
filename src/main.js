@@ -54,13 +54,14 @@ function boot() {
 function start(at = 0) {
   window.focus(); sound.init(); $('#start').style.display = 'none'; $('#end').style.display = 'none';
   film.reset(); game.reset(); fired = new Set(); T = at; phase = 'film'; ui.hud(false);
+  $('#pausebtn').style.display = 'none'; setPaused(false);
   for (const [t] of NARR) if (t < at) fired.add('n' + t);
   const m = [...MUSIC].reverse().find(([t]) => t <= at); if (m) sound.setMusic(m[1]);
   $('#skip').style.display = 'block';
 }
 function skipToFight() { if (phase !== 'film') return; if (T < T_SKIP) { for (const [t] of NARR) if (t < T_SKIP) fired.add('n' + t); T = T_SKIP; sound.setMusic('film3'); speechSynthesis?.cancel(); } }
 function beginFight() {
-  phase = 'fight'; $('#skip').style.display = 'none'; c2d.style.display = 'none';
+  phase = 'fight'; $('#skip').style.display = 'none'; $('#pausebtn').style.display = 'block'; c2d.style.display = 'none';
   game.startFight(); ui.hud(true); setTimeout(() => $('#keys').style.opacity = 0.0, 14000);
 }
 
@@ -97,7 +98,8 @@ addEventListener('keydown', e => {
 addEventListener('keyup', e => { keys[e.code] = false; syncMove(); });
 // Keys only reach the page while it has focus (inside an embedded frame this matters), so pause and say so when focus leaves.
 let paused = false;
-function setPaused(p) { paused = p && phase === 'fight' && game?.S.mode === 'fight'; $('#focus').style.display = paused ? 'grid' : 'none'; }
+function setPaused(p) { paused = p && phase === 'fight' && game?.S.mode === 'fight'; $('#focus').style.display = paused ? 'grid' : 'none'; const b = $('#pausebtn'); if (b) b.textContent = paused ? '▶' : '⏸'; }
+function togglePause() { setPaused(!paused); }
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; syncMove(); setPaused(true); });
 addEventListener('focus', () => setPaused(false));
 $('#focus').addEventListener('pointerdown', () => { window.focus(); setPaused(false); });
@@ -108,6 +110,7 @@ addEventListener('contextmenu', e => e.preventDefault());
 function toggleMute() { sound.setMute(!sound.muted); $('#mute').textContent = 'Sound: ' + (sound.muted ? 'off' : 'on'); }
 function retry() { $('#end').style.display = 'none'; ui.hud(true); ui.bossBar(1); ui.playerBar(1); game.restart(); ui.banner('ROUND 1', 'FIGHT!'); sound.sfx('bell'); }
 $('#mute').onclick = toggleMute;
+$('#pausebtn').onclick = togglePause;
 $('#skip').onclick = skipToFight;
 $('#play').onclick = () => start(0);
 $('#fightnow').onclick = () => { start(T_SKIP); };
