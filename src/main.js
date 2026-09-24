@@ -38,7 +38,7 @@ const NARR = [
   [52.5, 'Your move, Zest.'],
 ];
 const MUSIC = [[0, 'film1'], [22, 'film2'], [38, 'film3']];
-const T_3D = 36, T_FADE = [37.5, 40], T_ACT3 = 40, T_FIGHT = 60, T_SKIP = 55.6;
+const T_3D = 36, T_FADE = [38.3, 39.7], T_ACT3 = 40, T_FIGHT = 60, T_SKIP = 55.6;
 
 let world, film, game, T = 0, phase = 'menu', last = performance.now(), fired = new Set(), frames = 0;
 const c2d = $('#c2d');

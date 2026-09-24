@@ -132,6 +132,10 @@ export class Sound {
       case 'seed': { const { o } = this.osc('triangle', 1200, t, 0.06, 0.08 * vol, B); o.frequency.exponentialRampToValueAtTime(400, t + 0.05); break; }
       case 'bell': for (const [fr, d] of [[880, 0], [1320, 0.0]]) this.osc('sine', fr, t + d, 1.4, 0.2 * vol, B); this.osc('sine', 660, t + 0.35, 1.4, 0.2 * vol, B); break;
       case 'ui': this.osc('triangle', 1000, t, 0.06, 0.12 * vol, B); break;
+      case 'pop': { // paper standee inflating: a rising cork-pop plus a sparkle
+        const { o } = this.osc('sine', 220, t, 0.18, 0.35 * vol, B); o.frequency.exponentialRampToValueAtTime(880, t + 0.12);
+        this.noiseHit(t, 0.06, 0.25 * vol, 'bandpass', 3000, 2, B);
+        for (let i = 0; i < 3; i++) this.osc('triangle', 1760 * Math.pow(1.26, i), t + 0.08 + i * 0.05, 0.2, 0.06 * vol, B); break; }
       case 'dodge': { const { fl } = this.noiseHit(t, 0.18, 0.25 * vol, 'bandpass', 2000, 3, B); fl.frequency.exponentialRampToValueAtTime(500, t + 0.15); break; }
       case 'stun': for (let i = 0; i < 4; i++) this.osc('sine', 1400 + i * 300, t + i * 0.07, 0.15, 0.08 * vol, B); break;
     }

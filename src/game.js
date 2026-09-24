@@ -1,10 +1,12 @@
 // Act 3 (3D film shots) and the playable boss fight. Both run in the same scene so the handoff has no cut.
 import * as THREE from 'three';
 import { makeZest, makeNaranjo, ARENA_R, toon, outline } from './world3d.js';
+import { drawZest, drawNaranjo } from './film2d.js';
 
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const ease = t => { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); };
+const easeOutBack = t => { t = clamp(t, 0, 1); const c = 2.2; return 1 + (c + 1) * Math.pow(t - 1, 3) + c * Math.pow(t - 1, 2); };
 const damp = (a, b, s, dt) => a + (b - a) * (1 - Math.exp(-s * dt));
 const angDamp = (a, b, s, dt) => { let d = ((b - a + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI; return a + d * (1 - Math.exp(-s * dt)); };
 const yawTo = v => Math.atan2(v.x, v.z);
@@ -18,10 +20,36 @@ const PROPS = {
   seed: { name: 'Pip', dmg: 7, r: 0.15, col: 0xf6ecc8 },
 };
 
+// v1.5 2D->3D handoff: the act 2 paper drawings become flat cut-out standees in the 3D room, with a white sticker edge.
+// The camera orbits to show they are paper, then each one "inflates" into its 3D rig.
+function paperCard(draw, pose, height) {
+  const S = 1024, c = document.createElement('canvas'); c.width = c.height = S;
+  const art = document.createElement('canvas'); art.width = art.height = S; const a = art.getContext('2d');
+  a.translate(S / 2, S - 40); a.scale(2.4, 2.4); draw(a, { x: 0, y: 0, t: 0, blink: 0, look: 1, shade: 1, ...pose });
+  const white = document.createElement('canvas'); white.width = white.height = S; const w = white.getContext('2d');
+  w.drawImage(art, 0, 0); w.globalCompositeOperation = 'source-in'; w.fillStyle = '#fffaf0'; w.fillRect(0, 0, S, S);
+  const g = c.getContext('2d');
+  for (let i = 0; i < 16; i++) { const an = i / 16 * Math.PI * 2; g.drawImage(white, Math.cos(an) * 12, Math.sin(an) * 12); }
+  g.drawImage(art, 0, 0);
+  // crop to the drawn pixels so the plane hugs the figure
+  const d = g.getImageData(0, 0, S, S).data; let x0 = S, x1 = 0, y0 = S, y1 = 0;
+  for (let y = 0; y < S; y += 2) for (let x = 0; x < S; x += 2) if (d[(y * S + x) * 4 + 3] > 20) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
+  const u = height / (y1 - y0), geo = new THREE.PlaneGeometry((x1 - x0) * u, height);
+  const uv = geo.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, (x0 + uv.getX(i) * (x1 - x0)) / S, 1 - (y1 - uv.getY(i) * (y1 - y0)) / S);
+  geo.translate(((x0 + x1) / 2 - S / 2) * u, height / 2 + (S - 40 - y1) * u, 0);
+  const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: tex, alphaTest: 0.5, transparent: true, side: THREE.DoubleSide, roughness: 0.9 }));
+  m.castShadow = true; return m;
+}
+
 export function createGame(world, sound, ui) {
   const { scene, camera, fx } = world;
   const zest = makeZest(), nar = makeNaranjo();
-  zest.scale.setScalar(1.2); scene.add(zest, nar);
+  zest.scale.setScalar(1.2);
+  // Each rig sits in a world-aligned wrapper whose z scale flattens it to paper and back during the handoff.
+  const flatZ = new THREE.Group(), flatN = new THREE.Group(); flatZ.add(zest); flatN.add(nar); scene.add(flatZ, flatN);
+  const cardZ = paperCard(drawZest, { face: 1, mood: 'fierce', arms: 'fists' }, 2.3), cardN = paperCard(drawNaranjo, { face: -1, mood: 'smug', arms: 'idle' }, 3.5);
+  scene.add(cardZ, cardN);
   const Z = zest.userData, N = nar.userData;
 
   // ---------- prop meshes ----------
@@ -136,7 +164,8 @@ export function createGame(world, sound, ui) {
     return { pos, look };
   }
   const shots = [
-    { at: 0, f: ft => { const k = ease(ft / 5); return { pos: V(0, 1.9, 8.5).lerp(V(2, 9, 22), k), look: V(0, 1.5, 0).lerp(V(0, 0.5, 0), k) }; } },
+    // v1.5: pull back and swing round so the paper standees read as flat cut-outs standing in a real room
+    { at: 0, f: ft => { const k = ease(ft / 5); return { pos: V(0, 1.9, 8.5).lerp(V(11, 7.5, 17), k), look: V(0, 1.5, 0).lerp(V(0, 0.8, 0), k) }; } },
     { at: 5, f: ft => { const a = Math.PI - 0.9 + (ft - 5) * 0.22, B = S.boss.pos; return { pos: V(B.x + Math.cos(a) * 7, 2.4, B.z + Math.sin(a) * 7), look: B.clone().add(V(0, 1.9, 0)) }; } },
     { at: 11, f: ft => { const k = ease((ft - 11) / 5), P = S.player.pos; return { pos: P.clone().add(V(2.6, 1.8, 2.6).lerp(V(2.2, 1.7, 2.3), k)), look: P.clone().add(V(0, 1.5, 0)) }; } },
     { at: 15.6, f: () => gameCamIdeal() },
@@ -153,8 +182,22 @@ export function createGame(world, sound, ui) {
   }
   const events = new Set();
   function once(name, cond, fn) { if (cond && !events.has(name)) { events.add(name); fn(); } }
+  // paper standees inflate into the 3D rigs (ft = seconds into act 3)
+  const INFLATE = [[cardZ, flatZ, zest, 3.0, LEMON, 1.3], [cardN, flatN, nar, 3.45, ORANGE, 1.9]];
+  function paperToRig(ft) {
+    for (const [card, wrap, rig, at, col, cy] of INFLATE) {
+      const k = clamp((ft - at) / 0.6, 0, 1);
+      card.position.copy(rig.position); rig.visible = ft >= at;
+      card.material.opacity = 1 - clamp(k / 0.22, 0, 1); card.visible = card.material.opacity > 0;
+      wrap.scale.z = ft < at ? 0.02 : Math.max(0.02, easeOutBack(k));
+      wrap.scale.y = 1 + Math.sin(k * Math.PI) * 0.08 * (1 - k);
+      once('inflate' + at, ft >= at && ft < at + 0.5, () => { const p = rig.position.clone().add(V(0, cy, 0));
+        sound.sfx('pop'); fx.spark(p, 2.2); fx.juice(p, col, 16, 3.5, 3); fx.juice(p, 0xffffff, 10, 3, 2); });
+    }
+  }
   function filmUpdate(ft, dt) {
     S.t += dt;
+    paperToRig(ft);
     once('roar', ft >= 6, () => { sound.sfx('roar'); S.shake = 0.35; });
     once('slam', ft >= 8.2, () => { sound.sfx('slam'); S.shake = 0.8; fx.ring(S.boss.pos, { speed: 14 }); for (let i = 0; i < 20; i++) fx.juice(S.boss.pos.clone().add(V(0, 0.3, 0)), ORANGE, 2, 7, 5); });
     if (ft > 8.2 && ft < 10.5) for (const p of postsXZ) if (Math.random() < 0.5) fx.juice(p.clone().multiplyScalar(0.94).setY(0.2), Math.random() < 0.5 ? LEMON : ORANGE, 2, 1.2, 12);
@@ -432,7 +475,7 @@ export function createGame(world, sound, ui) {
     S.mode = 'fight'; S.elapsed = 0; S.boss.state = 'intro'; S.boss.st = 0; S.boss.cd = 1.8; S.endShown = false;
     ui.bossBar(1, 1); ui.playerBar(1); sound.setMusic('battle');
   }
-  function restart() { reset(); events.clear(); const c = gameCamIdeal(); camera.position.copy(c.pos); S.camLook.copy(c.look); startFight(); }
+  function restart() { reset(); events.clear(); paperToRig(99); const c = gameCamIdeal(); camera.position.copy(c.pos); S.camLook.copy(c.look); startFight(); }
 
   reset();
   return { S, input, press, filmUpdate, update, startFight, restart, reset: () => { reset(); events.clear(); } };
