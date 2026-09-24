@@ -8,6 +8,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 export const ARENA_R = 12;            // playable radius of the butcher-block ring
 const INK = 0x5a3a24;
+const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
 
 // ---------- shared materials ----------
 const toonRamp = (() => {
@@ -67,7 +68,7 @@ const naranjoTex = canvasTex(1024, 512, (g, w, h) => {
 
 const lemonTex = canvasTex(512, 256, (g, w, h) => {
   g.fillStyle = '#ffdc3f'; g.fillRect(0, 0, w, h);
-  for (let i = 0; i < 500; i++) { g.fillStyle = `rgba(${230 + Math.random() * 25},${180 + Math.random() * 40},20,${Math.random() * 0.25})`; g.beginPath(); g.arc(Math.random() * w, Math.random() * h, 2 + Math.random() * 8, 0, 7); g.fill(); }
+  for (let i = 0; i < 500; i++) { g.fillStyle = `rgba(${235 + Math.random() * 20},${200 + Math.random() * 30},40,${Math.random() * 0.18})`; g.beginPath(); g.arc(Math.random() * w, Math.random() * h, 2 + Math.random() * 8, 0, 7); g.fill(); }
 });
 
 // ---------- characters ----------
@@ -88,8 +89,14 @@ function limb(r, len, mat, out = 0.12) {
 }
 function collectMats(root) { const s = new Set(); root.traverse(o => { if (o.isMesh && !o.userData.isOutline && o.material.emissive) s.add(o.material); }); return [...s]; }
 
+function rig(cy) {
+  const root = new THREE.Group(), sq = new THREE.Group(), spin = new THREE.Group(), body = new THREE.Group();
+  root.add(sq); sq.add(spin); spin.position.y = cy; spin.add(body); body.position.y = -cy;
+  return { root, sq, spin, body };
+}
+
 export function makeZest() {
-  const root = new THREE.Group(), body = new THREE.Group(); root.add(body);
+  const { root, sq, spin, body } = rig(1.0);
   const skin = toon(0xffffff, { map: lemonTex, bumpMap: poreTex, bumpScale: 1.5 });
   // lathe body: center at y=1.05, half-height .65
   const pts = [];
@@ -132,20 +139,20 @@ export function makeZest() {
     const shoe = M(new THREE.SphereGeometry(0.12, 14, 10), toon(0xe0413a), { out: 0.12 }); shoe.scale.set(1, 0.65, 1.5); shoe.position.set(0, -0.44, 0.06); p.add(shoe);
     const toe = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), toon(0xffffff)); toe.scale.set(1, 0.6, 1); toe.position.set(0, -0.42, 0.22); p.add(toe);
     body.add(p); return p; });
-  root.userData = { body, torso, eyes: [eL, eR], brows, mouth, arms, legs, tail, tail2, leaf, mats: null, kind: 'zest' };
+  root.userData = { sq, spin, body, torso, eyes: [eL, eR], brows, mouth, arms, legs, tail, tail2, leaf, mats: null, kind: 'zest' };
   root.userData.mats = collectMats(root);
   return root;
 }
 
 export function makeNaranjo() {
-  const root = new THREE.Group(), body = new THREE.Group(); root.add(body);
   const R = 1.25, cy = 1.72;
+  const { root, sq, spin, body } = rig(cy);
   const skin = toon(0xffffff, { map: naranjoTex, bumpMap: poreTex, bumpScale: 2.5 });
   const torso = M(new THREE.SphereGeometry(R, 64, 40), skin, { out: 0.035 }); torso.position.y = cy; body.add(torso);
   // eyes placed in the painted eye holes
   const dir = (u, v) => { const phi = u * Math.PI * 2, th = v * Math.PI; return new THREE.Vector3(-Math.cos(phi) * Math.sin(th), Math.cos(th), Math.sin(phi) * Math.sin(th)); };
   const eyes = [-0.062, 0.062].map(du => { const d = dir(0.25 + du, 0.345); const e = eye(0.17, d.x * R * 0.93, cy + d.y * R * 0.93, d.z * R * 0.93);
-    e.lookAt(e.position.clone().add(d)); e.rotateY(0); body.add(e);
+    e.lookAt(e.position.clone().add(V3(d.x * 0.6, 0.15, 1))); body.add(e);
     const lid = M(new THREE.SphereGeometry(0.2, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), toon(0x8e2fa6), { out: 0.1 });
     lid.scale.set(1, 1.25, 0.7); lid.rotation.x = 0.25; e.add(lid); e.userData.lid = lid; return e; });
   // grin
@@ -182,7 +189,7 @@ export function makeNaranjo() {
   // dizzy stars
   const stars = new THREE.Group(); stars.position.y = cy + R + 0.6; stars.visible = false; body.add(stars);
   for (let i = 0; i < 4; i++) { const s = M(new THREE.OctahedronGeometry(0.14), toon(0xffe45a, { emissive: 0x664400 }), { out: 0.15 }); stars.add(s); }
-  root.userData = { body, torso, eyes, arms, legs, grin: grinG2, roarMouth, stars, R, cy, kind: 'naranjo' };
+  root.userData = { sq, spin, body, torso, eyes, arms, legs, grin: grinG2, roarMouth, stars, R, cy, kind: 'naranjo' };
   root.userData.mats = collectMats(root);
   return root;
 }
@@ -268,7 +275,7 @@ export class FX {
   constructor(scene) {
     this.scene = scene;
     const N = this.N = 700;
-    this.parts = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 1), new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.05, clearcoat: 1, transparent: true, opacity: 0.9, emissive: 0x221100 }), N);
+    this.parts = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 1), new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.05, clearcoat: 1, transparent: true, opacity: 0.92, emissive: 0x553300 }), N);
     this.parts.instanceMatrix.setUsage(THREE.DynamicDrawUsage); this.parts.frustumCulled = false; scene.add(this.parts);
     this.p = Array.from({ length: N }, () => ({ alive: false, pos: new THREE.Vector3(), vel: new THREE.Vector3(), s: 0, life: 0, col: new THREE.Color() }));
     this.cursor = 0; this.dummy = new THREE.Object3D();
@@ -289,7 +296,7 @@ export class FX {
   juice(pos, color, n = 20, spd = 5, up = 4) {
     for (let i = 0; i < n; i++) { const q = this.p[this.cursor]; this.cursor = (this.cursor + 1) % this.N;
       q.alive = true; q.pos.copy(pos); q.vel.set((Math.random() - 0.5) * spd * 2, Math.random() * up + 1, (Math.random() - 0.5) * spd * 2);
-      q.s = 0.05 + Math.random() * 0.12; q.life = 0; q.col.set(color); q.col.offsetHSL((Math.random() - 0.5) * 0.03, 0, (Math.random() - 0.5) * 0.1); }
+      q.s = 0.035 + Math.random() * 0.075; q.life = 0; q.col.set(color); q.col.offsetHSL((Math.random() - 0.5) * 0.03, 0, (Math.random() - 0.5) * 0.1); }
   }
   splat(x, z, color, size = 1) {
     if (Math.hypot(x, z) > ARENA_R + 0.7) return;

@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Orange vs Lemon</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Nunito:wght@600;800;900&display=swap" rel="stylesheet">
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+<style>
+:root { --ink:#5a3a24; --cream:#fff6e2; --lemon:#ffd83a; --orange:#ff8f24; --purple:#8e2fa6; --gold:#ffd24a; }
+* { box-sizing:border-box; }
+html,body { margin:0; height:100%; overflow:hidden; background:#1a0f1f; font-family:'Nunito',system-ui,sans-serif; color:var(--ink); touch-action:none; user-select:none; -webkit-user-select:none; }
+canvas { position:fixed; inset:0; width:100vw; height:100vh; display:block; }
+#c2d { z-index:2; pointer-events:none; }
+.disp { font-family:'Luckiest Guy','Arial Black',Impact,sans-serif; letter-spacing:.04em; }
+.paper { background:var(--cream); border:3px solid var(--ink); border-radius:14px; box-shadow:0 5px 0 rgba(90,58,36,.35), 0 10px 24px rgba(0,0,0,.25); }
+#start { position:fixed; inset:0; z-index:20; display:grid; place-items:center; background:radial-gradient(circle at 50% 40%,#ffb86b,#e0413a 60%,#5a1f3a); }
+#start .card { text-align:center; padding:28px 32px 24px; max-width:min(560px,calc(100vw - 32px)); transform:rotate(-1.5deg); }
+#start h1 { margin:0; font-size:clamp(40px,9vw,84px); line-height:.9; color:var(--orange); -webkit-text-stroke:3px var(--ink); paint-order:stroke fill; text-shadow:0 5px 0 var(--ink); }
+#start h1 .vs { color:var(--purple); font-size:.55em; display:block; margin:.1em 0; }
+#start h1 .lem { color:var(--lemon); }
+#start p { font-weight:800; margin:14px 0 18px; }
+.btn { font:inherit; font-family:'Luckiest Guy',Impact,sans-serif; font-size:24px; letter-spacing:.05em; padding:12px 26px 8px; border:3px solid var(--ink); border-radius:12px; background:var(--lemon); color:var(--ink); cursor:pointer; box-shadow:0 5px 0 var(--ink); margin:4px; }
+.btn:active { transform:translateY(4px); box-shadow:0 1px 0 var(--ink); }
+.btn.alt { background:var(--cream); font-size:18px; }
+#subs { position:fixed; left:50%; bottom:6vh; transform:translateX(-50%); z-index:6; max-width:min(880px,calc(100vw - 32px)); text-align:center; font-weight:900; font-size:clamp(16px,2.4vw,26px); color:#fff; text-shadow:0 2px 0 #000,0 0 12px rgba(0,0,0,.6); opacity:0; transition:opacity .4s; pointer-events:none; }
+#title { position:fixed; inset:0; z-index:5; display:grid; place-items:center; pointer-events:none; opacity:0; transition:opacity .5s; }
+#title div { font-size:clamp(46px,11vw,140px); color:var(--orange); -webkit-text-stroke:4px var(--ink); paint-order:stroke fill; text-shadow:0 8px 0 var(--ink); transform:rotate(-4deg); text-align:center; line-height:.85; }
+#title .vs { color:#fff; font-size:.45em; display:block; } #title .lem { color:var(--lemon); }
+#topbar { position:fixed; top:12px; right:12px; z-index:15; display:flex; gap:8px; }
+#topbar button { font:800 14px 'Nunito',sans-serif; padding:8px 12px; border:2px solid var(--ink); border-radius:10px; background:var(--cream); color:var(--ink); cursor:pointer; box-shadow:0 3px 0 var(--ink); }
+#hud { position:fixed; inset:0; z-index:8; pointer-events:none; opacity:0; transition:opacity .8s; }
+#hud.on { opacity:1; }
+#boss { position:absolute; top:14px; left:50%; transform:translateX(-50%); width:min(720px,calc(100vw - 150px)); }
+#boss .nm { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; }
+#boss .nm b { font-size:clamp(20px,3.4vw,32px); color:var(--purple); -webkit-text-stroke:2px var(--ink); paint-order:stroke fill; text-shadow:0 3px 0 var(--ink); }
+#boss .nm i { font-style:normal; font-weight:900; font-size:clamp(11px,1.5vw,14px); color:#fff; text-shadow:0 1px 0 var(--ink),0 0 6px rgba(0,0,0,.5); }
+.bar { position:relative; height:22px; border:3px solid var(--ink); border-radius:12px; background:#5a3a24; overflow:hidden; box-shadow:0 4px 0 rgba(90,58,36,.5); }
+.bar .fill { position:absolute; inset:0; transform-origin:left; transition:transform .25s cubic-bezier(.3,1.4,.5,1); }
+.bar .lag { position:absolute; inset:0; transform-origin:left; background:#fff3c4; transition:transform .9s .35s ease-out; }
+#boss .fill { background:repeating-linear-gradient(-45deg,#ff9a2e 0 14px,#ff8a1c 14px 28px); box-shadow:inset 0 5px 0 rgba(255,255,255,.35); }
+.bar .notch { position:absolute; top:0; bottom:0; width:3px; background:var(--ink); z-index:2; }
+#me { position:absolute; left:16px; bottom:16px; width:min(300px,45vw); }
+#me b { font-size:24px; color:var(--lemon); -webkit-text-stroke:2px var(--ink); paint-order:stroke fill; text-shadow:0 3px 0 var(--ink); }
+#me .fill { background:repeating-linear-gradient(-45deg,#ffe25a 0 12px,#ffd23a 12px 24px); box-shadow:inset 0 5px 0 rgba(255,255,255,.4); }
+#hint { position:absolute; left:50%; bottom:22px; transform:translateX(-50%); padding:8px 14px 6px; font-weight:900; font-size:16px; opacity:0; transition:opacity .2s; white-space:nowrap; }
+#keys { position:absolute; right:14px; bottom:14px; padding:10px 12px; font-weight:800; font-size:13px; line-height:1.7; transition:opacity 1s; }
+kbd { display:inline-block; min-width:22px; padding:0 6px; border:2px solid var(--ink); border-radius:6px; background:#fff; font:900 12px 'Nunito',sans-serif; text-align:center; box-shadow:0 2px 0 var(--ink); }
+#banner { position:fixed; inset:0; z-index:9; display:grid; place-items:center; pointer-events:none; }
+#banner .in { text-align:center; opacity:0; transform:scale(.6) rotate(-6deg); }
+#banner .in.show { animation:pop 2.2s cubic-bezier(.2,1.6,.4,1) forwards; }
+#banner h2 { margin:0; font-size:clamp(38px,8vw,96px); color:var(--gold); -webkit-text-stroke:4px var(--ink); paint-order:stroke fill; text-shadow:0 7px 0 var(--ink); }
+#banner p { margin:6px 0 0; font-weight:900; font-size:clamp(15px,2.2vw,22px); color:#fff; text-shadow:0 2px 0 var(--ink); }
+@keyframes pop { 0%{opacity:0;transform:scale(.4) rotate(-8deg)} 15%{opacity:1;transform:scale(1.08) rotate(-3deg)} 25%{transform:scale(1) rotate(-3deg)} 80%{opacity:1} 100%{opacity:0;transform:scale(1.1) rotate(-3deg)} }
+#end { position:fixed; inset:0; z-index:12; display:none; place-items:center; background:rgba(40,15,30,.55); }
+#end .card { padding:26px 30px; text-align:center; transform:rotate(1deg); max-width:calc(100vw - 32px); }
+#end h2 { margin:0; font-size:clamp(40px,8vw,76px); -webkit-text-stroke:3px var(--ink); paint-order:stroke fill; text-shadow:0 5px 0 var(--ink); }
+#end p { font-weight:800; font-size:18px; }
+#touch { position:fixed; inset:0; z-index:10; display:none; pointer-events:none; }
+#stick { position:absolute; left:24px; bottom:90px; width:130px; height:130px; border-radius:50%; background:rgba(255,246,226,.35); border:3px solid rgba(90,58,36,.6); pointer-events:auto; }
+#knob { position:absolute; left:40px; top:40px; width:50px; height:50px; border-radius:50%; background:var(--lemon); border:3px solid var(--ink); }
+#tbtns { position:absolute; right:18px; bottom:90px; display:grid; grid-template-columns:repeat(3,62px); gap:10px; pointer-events:auto; }
+#tbtns button { width:62px; height:62px; border-radius:50%; border:3px solid var(--ink); background:var(--cream); font:900 12px 'Nunito',sans-serif; color:var(--ink); box-shadow:0 4px 0 var(--ink); }
+#tbtns button.big { background:var(--lemon); }
+#vignette { position:fixed; inset:0; z-index:3; pointer-events:none; background:radial-gradient(ellipse at center,rgba(0,0,0,0) 55%,rgba(40,10,20,.35) 100%); }
+#err { position:fixed; left:16px; top:16px; z-index:50; color:#fff; font:14px monospace; white-space:pre-wrap; }
+</style>
+</head>
+<body>
+<canvas id="c3d"></canvas>
+<canvas id="c2d"></canvas>
+<div id="vignette"></div>
+<div id="title"><div class="disp">EL NARANJO<span class="vs">vs</span><span class="lem">ZEST</span></div></div>
+<div id="subs"></div>
+<div id="hud">
+  <div id="boss"><div class="nm disp"><b>EL NARANJO</b><i>Undefeated Heavyweight of the Juicer Ring</i></div>
+    <div class="bar"><div class="lag"></div><div class="fill"></div><div class="notch" style="left:66%"></div><div class="notch" style="left:33%"></div></div></div>
+  <div id="me"><b class="disp">ZEST</b><div class="bar"><div class="lag"></div><div class="fill"></div></div></div>
+  <div id="hint" class="paper"></div>
+  <div id="keys" class="paper"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move &nbsp; <kbd>Space</kbd> jump<br><kbd>J</kbd>/click punch &nbsp; <kbd>K</kbd>/right-click spin<br><kbd>Shift</kbd> dodge &nbsp; <kbd>E</kbd> grab / throw</div>
+</div>
+<div id="banner"><div class="in"><h2 class="disp"></h2><p></p></div></div>
+<div id="end"><div class="card paper"><h2 class="disp"></h2><p></p><button class="btn" id="retry">Fight again</button><button class="btn alt" id="replay">Watch the film</button></div></div>
+<div id="touch"><div id="stick"><div id="knob"></div></div>
+  <div id="tbtns"><button data-a="grab">GRAB</button><button data-a="heavy">SPIN</button><button data-a="dodge">DODGE</button><button data-a="jump">JUMP</button><button data-a="light" class="big" style="grid-column:span 2;width:134px;border-radius:32px">PUNCH</button></div></div>
+<div id="topbar"><button id="skip" style="display:none">Skip film ⏭</button><button id="mute">Sound: on</button></div>
+<div id="start"><div class="card paper">
+  <h1 class="disp">EL NARANJO<span class="vs">vs</span><span class="lem">ZEST</span></h1>
+  <p>A short film that becomes a boss fight. Sound on!</p>
+  <button class="btn" id="play">▶ Play</button><br><button class="btn alt" id="fightnow">Skip to the fight</button>
+</div></div>
+<div id="err"></div>
+<script>addEventListener('error', e => { document.getElementById('err').textContent += (e.message || e) + '\n'; });</script>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>
