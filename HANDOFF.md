@@ -55,7 +55,8 @@ The harness serves jsdelivr requests from the local `node_modules/three`, becaus
 - [x] 3D world, toon characters with outlines, kitchen arena (subway tiles, butcher-block ring, cinnamon posts, jars, kettle), juice and splats. Screenshot-tested.
 - [x] Act 3 shots and a seamless handoff into gameplay. Screenshot-tested at 40, 42, 49 and 56 s.
 - [x] Gameplay: player move, jump, dodge, 3-hit combo, spin, grab and throw; boss idle, bash, rolling charge (stuns on the ropes), seed barrage, leap slam with shockwave, phase roars; props restock. Bot-tested: damage lands both ways with no errors.
-- [x] HUD, banners, win and lose cards, retry, replay, mute, skip, touch controls.
+- [x] HUD, banners, win and lose cards, retry, replay, mute, skip, touch controls (joystick and buttons appear on coarse pointers).
+- [x] Focus pause: when the page loses keyboard focus mid-fight (for example when keys go to the chat around the artifact), the fight pauses and shows "Click the game to keep playing" (`setPaused` in `src/main.js`). Smoke-tested headless; not tested on a phone.
 - [ ] A full fight played to K.O. The headless sim is too slow, so phase 2 and 3 transitions and the win and lose cards are unverified in a real run.
 
 ## Next up (priority order)
