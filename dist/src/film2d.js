@@ -436,10 +436,11 @@ export function createFilm2D(canvas, sfx) {
   makeGrain();
   const fx = { shake: 0, flash: 0, sfx };
   function resize() {
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
-    canvas.width = innerWidth * dpr; canvas.height = innerHeight * dpr;
+    const dpr = Math.min(2, window.devicePixelRatio || 1), d = document.documentElement;
+    canvas.width = (d.clientWidth || innerWidth) * dpr; canvas.height = (d.clientHeight || innerHeight) * dpr;
   }
   resize(); addEventListener('resize', resize);
+  if (window.ResizeObserver) new ResizeObserver(resize).observe(document.documentElement);
   return {
     render(t, dt) {
       // Wide screens fill (cover); narrow ones, like a phone held upright, show the whole 16:9 frame (contain) so nobody gets cut off.

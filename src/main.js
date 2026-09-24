@@ -68,7 +68,7 @@ function start(at = 0) {
   const m = [...MUSIC].reverse().find(([t]) => t <= at); if (m) sound.setMusic(m[1]);
   $('#skip').style.display = 'block';
 }
-function skipToFight() { if (phase !== 'film') return; if (T < T_SKIP) { for (const [t] of NARR) if (t < T_SKIP) fired.add('n' + t); T = T_SKIP; sound.setMusic('lift'); speechSynthesis?.cancel(); } }
+function skipToFight() { if (phase !== 'film') return; if (T < T_SKIP) { for (const [t] of NARR) if (t < T_SKIP) fired.add('n' + t); T = T_SKIP; sound.setMusic('lift'); sound.hush(); } }
 function beginFight() {
   phase = 'fight'; if (isTouch) $('#touch').classList.add('on'); $('#skip').style.display = 'none'; c2d.style.display = 'none';
   game.startFight(); ui.hud(true); setTimeout(() => $('#keys').style.opacity = 0.0, 14000);

@@ -104,9 +104,19 @@ kbd { display:inline-block; min-width:22px; padding:0 6px; border:2px solid var(
   #tbtns { bottom:calc(20px + var(--sb)); grid-template-columns:repeat(3,56px); gap:8px; } #tbtns button { width:56px; height:56px; } #tbtns button.big { width:120px !important; }
   #me { width:min(240px,34vw); } #me b { font-size:18px; } #start .card { padding:14px 20px; } #start h1 { font-size:clamp(34px,12vh,64px); } #start p { margin:8px 0 10px; } }
 #rot { display:none; font-weight:800; font-size:14px; margin:0 0 12px; padding:6px 12px; border-radius:999px; background:var(--mint); border:2px solid var(--ink); }
-@media (orientation:portrait) and (pointer:coarse) { #rot { display:inline-block; } }
+@media (orientation:portrait) and (pointer:coarse) { #rot { display:block; width:fit-content; margin:0 auto 12px; } }
 #err:empty { display:none; }
-#err { position:fixed; left:calc(16px + var(--sl)); top:calc(16px + var(--st)); z-index:50; color:#fff; font:14px monospace; white-space:pre-wrap; max-width:calc(100vw - 32px); background:rgba(40,15,30,.8); padding:8px 10px; border-radius:8px; }
+#err { position:fixed; left:50%; transform:translateX(-50%); bottom:calc(8px + var(--sb)); z-index:50; color:#fff; font:12px monospace; white-space:pre-wrap; max-width:calc(100vw - 32px); max-height:30vh; overflow:auto; background:rgba(40,15,30,.85); padding:6px 10px; border-radius:8px; pointer-events:auto; }
+#err::after { content:'  (tap to hide)'; opacity:.6; }
+#tbtns button { padding:0; letter-spacing:-.02em; }
+/* very short frames, like the Android app's artifact viewer held sideways (~280px tall) */
+@media (max-height:360px) { #me { top:calc(10px + var(--st)); bottom:auto; left:calc(12px + var(--sl)); width:min(170px,26vw); } #me b { font-size:15px; } #me .bar, #boss .bar { height:16px; border-width:2px; }
+  #boss { top:calc(8px + var(--st)); width:calc(100vw - 2 * max(28vw, 120px)); } #boss .nm b { font-size:16px; -webkit-text-stroke:1px var(--ink); text-shadow:0 2px 0 var(--ink); }
+  #topbar { top:calc(8px + var(--st)); } #topbar button { font-size:12px; padding:5px 8px; }
+  #stick { bottom:calc(10px + var(--sb)); width:100px; height:100px; } #knob { left:25px; top:25px; }
+  #tbtns { bottom:calc(10px + var(--sb)); grid-template-columns:repeat(3,50px); gap:7px; } #tbtns button { width:50px; height:50px; font-size:10px; } #tbtns button.big { width:107px !important; }
+  #start .card { padding:10px 18px; } #start h1 { font-size:clamp(24px,11vh,40px); } #start p { margin:6px 0 8px; font-size:13px; } #start .btn { font-size:18px; padding:8px 18px 5px; } #start .btn.alt { font-size:14px; }
+  #hint { font-size:12px; } #subs { font-size:15px; bottom:calc(10px + var(--sb)); } }
 </style>
 </head>
 <body>
@@ -131,7 +141,7 @@ kbd { display:inline-block; min-width:22px; padding:0 6px; border:2px solid var(
 <div id="start"><div class="card paper">
   <h1 class="disp">EL NARANJO<span class="vs">vs</span><span class="lem">ZEST</span></h1>
   <p>A short film that becomes a boss fight. Sound on!</p>
-  <div id="rot">📱↻ Best played with your phone sideways</div><br>
+  <div id="rot">📱↻ Best played with your phone sideways</div>
   <button class="btn" id="play">▶ Play</button><br><button class="btn alt" id="fightnow">Skip to the fight</button>
 </div></div>
 <div id="focus"><div class="card paper"><b class="disp">Paused</b><p>Click the game to keep playing. Your keyboard only reaches the game while it has focus.</p></div></div>
@@ -139,6 +149,7 @@ kbd { display:inline-block; min-width:22px; padding:0 6px; border:2px solid var(
 <script>
 // Show errors on screen (phones have no console). WebGL problems from three.js are logged with console.error, so catch those too.
 (() => { const box = () => document.getElementById('err'), seen = new Set();
+  addEventListener('DOMContentLoaded', () => box().addEventListener('pointerdown', e => { e.stopPropagation(); box().textContent = ''; }));
   const show = m => { m = String(m).slice(0, 300); if (seen.has(m) || seen.size > 6) return; seen.add(m); box().textContent += m + '\n'; };
   addEventListener('error', e => show(e.message || e));
   addEventListener('unhandledrejection', e => show(e.reason?.message || e.reason));

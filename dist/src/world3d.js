@@ -414,21 +414,23 @@ export function fitCamera(camera, w, h) {
   camera.fov = a >= BASE_ASPECT ? BASE_FOV : Math.min(MAX_FOV, 2 * Math.atan(Math.tan(BASE_FOV * Math.PI / 360) * BASE_ASPECT / a) * 180 / Math.PI);
   camera.updateProjectionMatrix();
 }
+// The real layout box (the frame in embedded viewers), not the window's idea of it.
+export function viewSize() { const d = document.documentElement; return [d.clientWidth || innerWidth, d.clientHeight || innerHeight]; }
 export function createWorld(canvas) {
   const renderer = makeRenderer(canvas);
-  renderer.setPixelRatio(Math.min(MOBILE ? 1.5 : 2, devicePixelRatio)); renderer.setSize(innerWidth, innerHeight);
+  renderer.setPixelRatio(Math.min(MOBILE ? 1.5 : 2, devicePixelRatio)); renderer.setSize(...viewSize());
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   // Neutral tone mapping keeps the lemon a clean yellow (ACES pushed it olive).
   renderer.toneMapping = THREE.NeutralToneMapping; renderer.toneMappingExposure = 0.92;
-  const hf = !new URLSearchParams(location.search).has('lowgl') && halfFloatOK(renderer);   // ?lowgl forces the 8-bit path for testing
+  const qp = new URLSearchParams(location.search);
+  const hf = !qp.has('lowgl') && halfFloatOK(renderer);   // ?lowgl forces the 8-bit path for testing
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0xeef3ea);
   scene.fog = new THREE.Fog(0xf1efe4, 42, 120);
-  if (!hf) renderer.toneMappingExposure = 1.05;   // no bloom or env light on this path, so open up a little
   if (hf) { const pmrem = new THREE.PMREMGenerator(renderer);
     scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture; scene.environmentIntensity = 0.6; pmrem.dispose(); }
-  const camera = new THREE.PerspectiveCamera(BASE_FOV, innerWidth / innerHeight, 0.1, 300);
-  fitCamera(camera, innerWidth, innerHeight);
+  const camera = new THREE.PerspectiveCamera(BASE_FOV, 16 / 9, 0.1, 300);
+  fitCamera(camera, ...viewSize());
   camera.position.set(0, 1.6, 9);
   // lights (v1.5 high key): big soft sky fill with lifted shadows, a warm window key, a mint bounce rim
   scene.add(new THREE.HemisphereLight(0xfffaf0, 0xcdb89c, hf ? 1.05 : 1.35));
@@ -439,21 +441,54 @@ export function createWorld(canvas) {
   const rim = new THREE.DirectionalLight(0xc8f0e0, 1.0); rim.position.set(-10, 8, 14); scene.add(rim);
   buildArena(scene);
   const fx = new FX(scene);
-  // Composer target: half float where the GPU can render to it (MSAA on desktop only), plain 8-bit otherwise.
-  const rt = new THREE.WebGLRenderTarget(innerWidth * renderer.getPixelRatio(), innerHeight * renderer.getPixelRatio(),
-    { type: hf ? THREE.HalfFloatType : THREE.UnsignedByteType, samples: MOBILE || !renderer.capabilities.isWebGL2 ? 0 : 4 });
-  const composer = new EffectComposer(renderer, rt);
-  composer.addPass(new RenderPass(scene, camera));
-  // Bloom renders into half-float targets of its own, so it is skipped when those aren't supported.
-  if (hf) { const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.22, 0.6, 0.93); composer.addPass(bloom); }
-  composer.addPass(new OutputPass());
-  const grade = new ShaderPass(GradeShader); composer.addPass(grade);
-  const resize = () => { renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight); fitCamera(camera, innerWidth, innerHeight); };
+  // Post chain: RenderPass -> bloom (half float only) -> OutputPass -> grade. Target is half float where the GPU can
+  // render to it (MSAA on desktop only), plain 8-bit otherwise.
+  const grade = new ShaderPass(GradeShader);
+  const [vw, vh] = viewSize();
+  function buildComposer(half) {
+    const pr = renderer.getPixelRatio();
+    const rt = new THREE.WebGLRenderTarget(vw * pr, vh * pr, { type: half ? THREE.HalfFloatType : THREE.UnsignedByteType, samples: MOBILE || !renderer.capabilities.isWebGL2 ? 0 : 4 });
+    const c = new EffectComposer(renderer, rt);
+    c.addPass(new RenderPass(scene, camera));
+    if (half) c.addPass(new UnrealBloomPass(new THREE.Vector2(vw, vh), 0.22, 0.6, 0.93));
+    c.addPass(new OutputPass()); c.addPass(grade);
+    return c;
+  }
+  // Self-test: some phone GPUs and WebViews (seen in the Claude Android app) accept every call but draw nothing except the
+  // clear colour. Render a small red test scene through each pipeline, read one pixel back, and use the first that
+  // really draws: full post chain -> 8-bit post chain without bloom/env -> plain direct render. ?safe forces direct.
+  function drawsRed(render) {
+    const ts = new THREE.Scene(); ts.background = scene.background; ts.fog = scene.fog; ts.environment = scene.environment;
+    const tc = new THREE.PerspectiveCamera(50, vw / vh, 0.1, 100);
+    const l = new THREE.DirectionalLight(0xffffff, 2); l.position.set(2, 5, 3); l.castShadow = true; ts.add(l, new THREE.HemisphereLight(0xffffff, 0x888888, 1));
+    const box = new THREE.Mesh(new THREE.BoxGeometry(6, 6, 1), toon(0xff2010)); box.position.z = -8; box.castShadow = box.receiveShadow = true; ts.add(box);
+    const out = new Uint8Array(4), gl = renderer.getContext();
+    try { render(ts, tc); gl.readPixels(Math.floor(gl.drawingBufferWidth / 2), Math.floor(gl.drawingBufferHeight / 2), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, out); }
+    catch (e) { return false; } finally { box.geometry.dispose(); box.material.dispose(); l.dispose(); }
+    return out[0] > out[1] + 60 && out[0] > out[2] + 60;
+  }
+  // Without bloom, grade and the env map the image reads darker and chrome goes black: open up and soften metals.
+  const env = scene.environment, bright = () => { scene.environment = null; renderer.toneMappingExposure = 1.15;
+    scene.traverse(o => { const m = o.material; if (m && m.metalness > 0.4) { m.metalness = 0.25; m.roughness = Math.max(m.roughness, 0.35); } }); };
+  const viaComposer = c => (ts, tc) => { const p = c.passes[0]; p.scene = ts; p.camera = tc; try { c.render(); } finally { p.scene = scene; p.camera = camera; } };
+  const direct = (ts, tc) => { renderer.setRenderTarget(null); renderer.render(ts, tc); };
+  let composer = null, mode = 'direct';
+  if (!qp.has('safe')) {
+    if (hf) { const c = buildComposer(true); if (drawsRed(viaComposer(c))) { composer = c; mode = 'post'; } else c.dispose(); }
+    if (!composer) { if (env) { scene.environment = null; } const c = buildComposer(false); if (drawsRed(viaComposer(c))) { composer = c; mode = 'post8'; bright(); } else c.dispose(); }
+  }
+  if (!composer) { bright(); if (!qp.has('safe') && !drawsRed(direct)) console.error('WebGL self-test: this device drew nothing in any render mode.'); }
+  renderer.setRenderTarget(null); renderer.clear();
+  const resize = () => { const [w, h] = viewSize(); renderer.setSize(w, h); composer?.setSize(w, h); fitCamera(camera, w, h); };
   addEventListener('resize', resize);
+  // The Android app's viewer resizes its frame without always firing a window resize; watch the root box too.
+  if (window.ResizeObserver) new ResizeObserver(resize).observe(document.documentElement);
   // Phones drop the GL context under memory pressure or when the tab goes to the background. Ask the browser to give it
   // back instead of leaving a dead canvas; three.js rebuilds its state on restore.
   let lost = false;
   canvas.addEventListener('webglcontextlost', e => { e.preventDefault(); lost = true; });
   canvas.addEventListener('webglcontextrestored', () => { lost = false; resize(); });
-  return { THREE, renderer, scene, camera, fx, composer, grade, render: () => { if (lost) return; grade.uniforms.time.value = performance.now() / 1000; composer.render(); } };
+  return { THREE, renderer, scene, camera, fx, composer, grade, mode, render: () => {
+    if (lost) return; grade.uniforms.time.value = performance.now() / 1000;
+    if (composer) composer.render(); else { renderer.setRenderTarget(null); renderer.render(scene, camera); } } };
 }
