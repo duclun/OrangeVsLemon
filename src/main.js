@@ -52,7 +52,7 @@ function boot() {
 }
 
 function start(at = 0) {
-  sound.init(); $('#start').style.display = 'none'; $('#end').style.display = 'none';
+  window.focus(); sound.init(); $('#start').style.display = 'none'; $('#end').style.display = 'none';
   film.reset(); game.reset(); fired = new Set(); T = at; phase = 'film'; ui.hud(false);
   for (const [t] of NARR) if (t < at) fired.add('n' + t);
   const m = [...MUSIC].reverse().find(([t]) => t <= at); if (m) sound.setMusic(m[1]);
@@ -80,7 +80,7 @@ function loop(now) {
     if (T >= T_FIGHT) beginFight();
     return;
   }
-  game.update(dt); world.render();
+  if (!paused) game.update(dt); world.render();
 }
 
 // ---------- input ----------
@@ -88,14 +88,20 @@ const keys = {};
 const KEYMAP = { Space: 'jump', KeyJ: 'light', KeyK: 'heavy', ShiftLeft: 'dodge', ShiftRight: 'dodge', KeyL: 'dodge', KeyE: 'grab' };
 function syncMove() { if (!game) return; game.input.mx = (keys.KeyD || keys.ArrowRight ? 1 : 0) - (keys.KeyA || keys.ArrowLeft ? 1 : 0); game.input.my = (keys.KeyW || keys.ArrowUp ? 1 : 0) - (keys.KeyS || keys.ArrowDown ? 1 : 0); }
 addEventListener('keydown', e => {
-  if (e.repeat) return; keys[e.code] = true; syncMove();
+  if (e.repeat) return; keys[e.code] = true; syncMove(); if (paused) setPaused(false);
   if (KEYMAP[e.code] && phase === 'fight') { game.press(KEYMAP[e.code]); e.preventDefault(); }
   if (e.code === 'Enter') { if (phase === 'menu') start(); else skipToFight(); }
   if (e.code === 'KeyM') toggleMute();
   if (e.code === 'KeyR' && phase === 'fight' && (game.S.mode === 'won' || game.S.mode === 'lost')) retry();
 });
 addEventListener('keyup', e => { keys[e.code] = false; syncMove(); });
-addEventListener('blur', () => { for (const k in keys) keys[k] = false; syncMove(); });
+// Keys only reach the page while it has focus (inside an embedded frame this matters), so pause and say so when focus leaves.
+let paused = false;
+function setPaused(p) { paused = p && phase === 'fight' && game?.S.mode === 'fight'; $('#focus').style.display = paused ? 'grid' : 'none'; }
+addEventListener('blur', () => { for (const k in keys) keys[k] = false; syncMove(); setPaused(true); });
+addEventListener('focus', () => setPaused(false));
+$('#focus').addEventListener('pointerdown', () => { window.focus(); setPaused(false); });
+addEventListener('pointerdown', () => window.focus());
 $('#c3d').addEventListener('mousedown', e => { if (phase !== 'fight') return; game.press(e.button === 2 ? 'heavy' : 'light'); });
 addEventListener('contextmenu', e => e.preventDefault());
 
