@@ -279,7 +279,7 @@ export class FX {
   constructor(scene) {
     this.scene = scene;
     const N = this.N = 700;
-    this.parts = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 1), new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.05, clearcoat: 1, transparent: true, opacity: 0.92, emissive: 0x553300 }), N);
+    this.parts = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 1), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.15, transparent: true, opacity: 0.92, emissive: 0x553300 }), N);
     this.parts.instanceMatrix.setUsage(THREE.DynamicDrawUsage); this.parts.frustumCulled = false; scene.add(this.parts);
     this.p = Array.from({ length: N }, () => ({ alive: false, pos: new THREE.Vector3(), vel: new THREE.Vector3(), s: 0, life: 0, col: new THREE.Color() }));
     this.cursor = 0; this.dummy = new THREE.Object3D();
@@ -322,12 +322,12 @@ export class FX {
     const r = { mesh: m, r: telegraph ? max : 0.5, speed, max, width, telegraph, life, t: 0, hit: false }; this.rings.push(r); return r;
   }
   update(dt, onLand) {
-    const d = this.dummy;
+    const d = this.dummy, tmp = this._tmp || (this._tmp = new THREE.Vector3());
     for (let i = 0; i < this.N; i++) { const q = this.p[i]; if (!q.alive) continue;
       q.life += dt; q.vel.y -= 18 * dt; q.pos.addScaledVector(q.vel, dt);
       if (q.pos.y < 0.02) { q.alive = false; if (Math.random() < 0.18) onLand?.(q); }
       if (q.life > 2.5) q.alive = false;
-      d.position.copy(q.pos); const st = Math.min(1.8, 1 + q.vel.length() * 0.04); d.scale.set(q.s, q.s * st, q.s); d.lookAt(q.pos.clone().add(q.vel)); d.rotateX(Math.PI / 2);
+      d.position.copy(q.pos); const st = Math.min(1.8, 1 + q.vel.length() * 0.04); d.scale.set(q.s, q.s * st, q.s); d.lookAt(tmp.copy(q.pos).add(q.vel)); d.rotateX(Math.PI / 2);
       if (!q.alive) d.scale.setScalar(0); d.updateMatrix(); this.parts.setMatrixAt(i, d.matrix); this.parts.setColorAt(i, q.col); }
     this.parts.instanceMatrix.needsUpdate = true; this.parts.instanceColor.needsUpdate = true;
     for (const s of this.splats) { const u = s.userData; if (u.t < 1) { u.t = Math.min(1, u.t + dt * 5); s.scale.setScalar(u.target * (1 - Math.pow(1 - u.t, 3))); } }
@@ -342,8 +342,10 @@ export class FX {
 
 // ---------- world ----------
 export function createWorld(canvas) {
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-  renderer.setPixelRatio(Math.min(2, devicePixelRatio)); renderer.setSize(innerWidth, innerHeight);
+  // v2 perf: phones (coarse pointer) skip bloom/MSAA, render at 1x DPR — mobile GPUs choke otherwise
+  const PERF = matchMedia('(pointer: coarse)').matches;
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: !PERF, powerPreference: 'high-performance' });
+  renderer.setPixelRatio(PERF ? 1 : Math.min(2, devicePixelRatio)); renderer.setSize(innerWidth, innerHeight);
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 0.95;
   const scene = new THREE.Scene();
@@ -356,14 +358,14 @@ export function createWorld(canvas) {
   // lights: warm sunset key from the window, cool rim, soft fill
   scene.add(new THREE.HemisphereLight(0xfff1dc, 0x7a5a3a, 0.85));
   const sun = new THREE.DirectionalLight(0xffc48a, 2.4); sun.position.set(8, 18, -16); sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048); const sc = sun.shadow.camera; sc.left = sc.bottom = -16; sc.right = sc.top = 16; sc.near = 1; sc.far = 60; sun.shadow.bias = -0.0005; sun.shadow.normalBias = 0.03;
+  sun.shadow.mapSize.set(PERF ? 1024 : 2048, PERF ? 1024 : 2048); const sc = sun.shadow.camera; sc.left = sc.bottom = -16; sc.right = sc.top = 16; sc.near = 1; sc.far = 60; sun.shadow.bias = -0.0005; sun.shadow.normalBias = 0.03;
   scene.add(sun);
   const rim = new THREE.DirectionalLight(0x9ad7ff, 1.2); rim.position.set(-10, 8, 14); scene.add(rim);
   buildArena(scene);
   const fx = new FX(scene);
   const composer = new EffectComposer(renderer);
   composer.addPass(new RenderPass(scene, camera));
-  const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.18, 0.45, 0.97); composer.addPass(bloom);
+  if (!PERF) { const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.18, 0.45, 0.97); composer.addPass(bloom); }
   composer.addPass(new OutputPass());
   addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); });
   return { THREE, renderer, scene, camera, fx, composer, render: () => composer.render() };
