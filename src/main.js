@@ -137,7 +137,17 @@ if (qs.has('fps')) {
   let acc = 0, n = 0, lastF = performance.now();
   const _loop = () => {
     const now = performance.now(), f = now - lastF; lastF = now; acc += f; n++;
-    if (acc >= 500) { el.textContent = `${(1000 / (acc / n)).toFixed(0)} fps · ${(acc / n).toFixed(1)} ms/frame`; acc = 0; n = 0; }
+    if (acc >= 500) {
+      let gpu = '?';
+      try {
+        const gl = window.GAME.world.renderer.getContext();
+        const ext = gl.getExtension('WEBGL_debug_renderer_info');
+        gpu = ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : 'n/a';
+      } catch (e) { /* ignore */ }
+      const w = window.GAME.world;
+      el.textContent = `${(1000 / (acc / n)).toFixed(0)} fps · ${(acc / n).toFixed(1)} ms/f · dpr ${w.renderer.getPixelRatio()} · perf ${w.perf ? 'on' : 'off'}\n${String(gpu).slice(0, 60)}`;
+      acc = 0; n = 0;
+    }
     requestAnimationFrame(_loop);
   };
   requestAnimationFrame(_loop);

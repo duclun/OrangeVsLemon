@@ -346,7 +346,7 @@ export function createWorld(canvas) {
   const PERF = matchMedia('(pointer: coarse)').matches;
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: !PERF, powerPreference: 'high-performance' });
   renderer.setPixelRatio(PERF ? 1 : Math.min(2, devicePixelRatio)); renderer.setSize(innerWidth, innerHeight);
-  renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.enabled = true; renderer.shadowMap.type = PERF ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 0.95;
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0xf3d9a8);
@@ -368,5 +368,8 @@ export function createWorld(canvas) {
   if (!PERF) { const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.18, 0.45, 0.97); composer.addPass(bloom); }
   composer.addPass(new OutputPass());
   addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); });
-  return { THREE, renderer, scene, camera, fx, composer, render: () => composer.render() };
+  // v2 perf: on phones skip the composer entirely (half-float fullscreen passes are slow on tile GPUs)
+  const direct = PERF;
+  if (direct) { renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05; }
+  return { THREE, renderer, scene, camera, fx, composer, perf: PERF, render: () => direct ? renderer.render(scene, camera) : composer.render() };
 }
