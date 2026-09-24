@@ -67,6 +67,15 @@ The harness serves jsdelivr requests from the local `node_modules/three`, becaus
 5. **Mobile.** Test touch controls on a phone and check performance (drop shadows to 1024 and bloom off on coarse pointers).
 6. **Optional Blender pass on Alan's device:** Mantaflow juice splash for the K.O. and the act 3 geysers, rendered to a transparent video and layered in.
 
+## v2 (branch `build/v2`, started 2026-09-24)
+Reference: the Opus Lemon vs Orange clip Alan shared — local copy `~/workspace/orange-vs-lemon/ref/orangevslemon-ref.mp4` (87 s, pulled from his Drive; from https://www.youtube.com/watch?v=2WyFHZ6lkWE). Used for technique, mood, assets and music direction only — character designs stay original per the style rules above (no headband, no mustache/monocle/crown). The clip is effectively silent, so the v2 battle theme is an original composition in a bouncy cartoon-fight spirit.
+v2 changes so far:
+- Red-gingham jar lids on the background jars (reference kitchen signature).
+- New props: blueberry (pops with blue juice) and chocolate chunk (stuns); 10 props at fight start, both in the restock pool.
+- `fx.burst`: big white impact flash + shock ring + juice on every hit (reference's crunchy hit feel).
+- K.O.: 1.4 s of 0.22x slow-motion, juice fountain, big burst, and a `ko` stinger (descending boom + splash + bell). Camera orbit around cheering Zest still open.
+- New `battle`/`boss3` arrangement: marimba-ish triangle lead playing an original 4-bar melody over a walking bass (148/164 BPM kept).
+
 ## Known bugs / rough edges
 - The act 3 handoff camera briefly sits close behind Zest (around 55.5–57 s) before the gameplay camera settles. The anti-clip keeps it outside him, but it could frame better.
 - `sfx('warn')` in `bashWind` uses a timing check (`B.st < dt*1.5`) that can fire twice or not at all at odd frame rates. It should be a flag.

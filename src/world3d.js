@@ -251,11 +251,15 @@ function buildArena(scene) {
     const f = M(new THREE.BoxGeometry(w, h, 0.6), frameMat, { out: 0.03 }); f.position.set(x, y, -31.6); g.add(f); }
   // props on the back counter: jars, kettle, basil pot, pans
   const glass = new THREE.MeshPhysicalMaterial({ color: 0xeaf6f4, roughness: 0.05, transparent: true, opacity: 0.35, clearcoat: 1, envMapIntensity: 1.5 });
+  // red gingham lid fabric (v2, from the reference kitchen)
+  const gingham = canvasTex(128, 128, (c, w, h) => { const n = 8, s = w / n;
+    c.fillStyle = '#ffffff'; c.fillRect(0, 0, w, h); c.fillStyle = 'rgba(224,65,58,0.55)';
+    for (let i = 0; i < n; i += 2) { c.fillRect(i * s, 0, s, h); c.fillRect(0, i * s, w, s); } }, { repeat: [3, 1] });
   const jars = [[-20, -22, 3, 7, 0xffb43a], [-15.5, -23, 2.4, 5.5, 0xe0413a], [-11.5, -24, 2.2, 6.5, 0x9bc86a], [17, -21, 2.8, 6, 0xffe07a]];
   for (const [x, z, r, h, col] of jars) {
     const jar = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, 32), glass); jar.position.set(x, h / 2 - 0.8, z); g.add(jar);
     const fill = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.9, r * 0.9, h * 0.7, 24), toon(col)); fill.position.set(x, h * 0.35 - 0.7, z); g.add(fill);
-    const lid = M(new THREE.CylinderGeometry(r * 0.85, r * 0.85, 0.9, 24), toon(0xc49a6c, { bumpMap: poreTex, bumpScale: 4 }), { out: 0.04 }); lid.position.set(x, h - 0.35, z); g.add(lid);
+    const lid = M(new THREE.CylinderGeometry(r * 0.85, r * 0.85, 0.9, 24), new THREE.MeshStandardMaterial({ map: gingham, roughness: 0.65 }), { out: 0.04 }); lid.position.set(x, h - 0.35, z); g.add(lid);
   }
   const chrome = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 1, roughness: 0.12 });
   const kettle = new THREE.Mesh(new THREE.SphereGeometry(4.5, 40, 30), chrome); kettle.scale.set(1, 0.85, 1); kettle.position.set(24, 3, -14); g.add(kettle);
@@ -306,6 +310,12 @@ export class FX {
     if (this.splats.length > 160) { const old = this.splats.shift(); this.scene.remove(old); old.material.dispose(); }
   }
   spark(pos, size = 1.4) { const s = this.sparks.find(s => s.userData.t >= 1) || this.sparks[0]; s.position.copy(pos); s.userData.t = 0; s.userData.size = size; s.visible = true; s.material.rotation = Math.random() * 6; }
+  // v2: big crunchy impact burst — white star flash + shock ring + juice (reference hit feel)
+  burst(pos, size = 3, juiceColor = 0xfff2c0) {
+    this.spark(pos, size * 1.6);
+    this.ring(pos, { color: 0xffffff, speed: 18, max: size * 2.4 });
+    this.juice(pos, juiceColor, Math.round(size * 9), size * 2.2, size * 1.8);
+  }
   ring(pos, { color = 0xff8f24, speed = 10, max = ARENA_R + 1, width = 0.6, telegraph = false, life = 1 } = {}) {
     const m = new THREE.Mesh(new THREE.RingGeometry(0.9, 1, 64), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: telegraph ? 0.5 : 0.9, side: THREE.DoubleSide, depthWrite: false }));
     m.rotation.x = -Math.PI / 2; m.position.set(pos.x, 0.05, pos.z); this.scene.add(m);
