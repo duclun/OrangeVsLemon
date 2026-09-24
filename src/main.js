@@ -129,6 +129,19 @@ if (isTouch) {
 }
 
 boot();
+// perf diagnostics: ?fps=1 shows a live FPS + frame-time readout (top-left) to settle "still slow" reports
+if (qs.has('fps')) {
+  const el = document.createElement('div');
+  el.style.cssText = 'position:fixed;top:8px;left:8px;z-index:99;background:rgba(0,0,0,.65);color:#0f0;font:12px monospace;padding:6px 8px;border-radius:6px;pointer-events:none;white-space:pre';
+  document.body.appendChild(el);
+  let acc = 0, n = 0, lastF = performance.now();
+  const _loop = () => {
+    const now = performance.now(), f = now - lastF; lastF = now; acc += f; n++;
+    if (acc >= 500) { el.textContent = `${(1000 / (acc / n)).toFixed(0)} fps · ${(acc / n).toFixed(1)} ms/frame`; acc = 0; n = 0; }
+    requestAnimationFrame(_loop);
+  };
+  requestAnimationFrame(_loop);
+}
 // test hooks: ?t=SECONDS starts the film at that time without the menu; ?fight=1 jumps straight into the fight
 if (qs.has('t')) start(parseFloat(qs.get('t')));
 if (qs.has('fight')) { start(T_FIGHT - 0.01); }
