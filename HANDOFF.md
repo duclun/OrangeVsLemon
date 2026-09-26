@@ -29,7 +29,7 @@ Alan saw a WebGL error and a cut-off view on his Pixel 10. Changes:
 - The app's WebView has **no Web Speech API**. `skipToFight` called `speechSynthesis?.cancel()`, which throws a ReferenceError on an undeclared global. All speech now goes through `sound.hush()` / `sound.say()`. When there is no speech API or no voices, `say()` falls back to `babble()`: a wordless, formant-filtered "narrator murmur" (one blip per syllable-ish, music ducked) while the subtitle carries the words.
 - The 3D scene came up as only the clear colour (no arena, no fighters, not even the outlines) in that WebView. Cause not pinned down (no device here). `createWorld` now **self-tests**: it renders a red toon box through each pipeline, reads one pixel back, and uses the first that really draws: `post` (half-float composer with bloom and env) → `post8` (8-bit composer, no bloom/env) → `direct` (plain `renderer.render`, no post). `GAME.world.mode` says which one. `?safe` forces `direct`, and `?lowgl` skips half float. Fallback modes raise exposure and soften metals (no env map, so chrome went black).
 - Sizing follows `document.documentElement` client size (`viewSize()`) with a `ResizeObserver`, as well as window resize. A `max-height:360px` layout moves Zest's bar to the top left, shrinks controls, and fits the start card. The error box sits bottom-centre, and a tap hides it.
-- Tested with emulation at 640×280 with `speechSynthesis` deleted: skip works with no error, subtitles show, `post` and `direct` both render. **Still not confirmed on the real device.**
+- Tested with emulation at 640×280 with `speechSynthesis` deleted: skip works with no error, subtitles show, `post` and `direct` both render. **Confirmed fixed by Alan on his Pixel 10 on 2026-09-26.**
 
 ## Style rules (non-negotiable)
 - **Original designs only.** Zest wears a peel scarf, goggles on the forehead, a band-aid and red sneakers. El Naranjo wears a purple luchador mask with gold flame trim, a champion belt and purple boots. Don't use a headband lemon, and don't give the orange a crown, mustache or monocle. Those belong to the reference video.
@@ -97,7 +97,7 @@ node shoot.mjs "index.html?t=30" shots/t30.png "GAME.T > 30.5" ["optional JS to 
 2. **Act 2→3 transition.** Today it is a crossfade onto a matching 3D frame. The vision is for the paper layers to peel or fly apart into the 3D scene. Try rendering the 2D layers as textured planes in the 3D scene for the last 2 s.
 3. **K.O. moment.** Slow-motion final hit, a big juice fountain, and the camera orbiting Zest cheering.
 4. **3D Zest polish.** Mouth shapes (grit, O), a stronger rubber-hose stretch on punches, and a clearer goggles silhouette. The lemon still reads slightly olive under the toon ramp.
-5. **Mobile.** Confirm the mobile fixes on Alan's Pixel 10 (see above). If the WebGL error persists, get its exact text from the on-screen error box.
+5. **Mobile.** Fixed and confirmed on Alan's Pixel 10 (see above). Still to check: phone performance through a full fight.
 6. **Optional Blender pass on Alan's device:** Mantaflow juice splash for the K.O. and the act 3 geysers, rendered to a transparent video and layered in.
 
 ## Known bugs / rough edges
