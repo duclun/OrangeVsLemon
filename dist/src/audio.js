@@ -218,39 +218,13 @@ export class Sound {
   boomSfx(t, v) { const { o } = this.osc('sine', 110, t, 0.9, v, this.sfxBus); o.frequency.exponentialRampToValueAtTime(28, t + 0.8); }
 
   // ---- narration ----
-  // Speech synthesis where the browser has it (with at least one voice). Some embedded viewers, like the Android app's
-  // WebView, have no speech API or no voices; there the narrator "babbles" instead: a warm, wordless murmur with one
-  // syllable-ish blip per word, cartoon style, while the subtitle carries the words.
-  hasSpeech() { try { return 'speechSynthesis' in window && speechSynthesis.getVoices().length > 0; } catch (e) { return false; } }
+  // Spoken with speech synthesis. Where the browser has no speech API (the Claude Android app's viewer) the film plays
+  // with subtitles only.
   hush() { try { if ('speechSynthesis' in window) speechSynthesis.cancel(); } catch (e) { } }
   say(text) {
-    if (this.muted) return;
-    if (!this.hasSpeech()) return this.babble(text);
+    if (this.muted || !('speechSynthesis' in window)) return;
     try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); if (this.voice) u.voice = this.voice; u.rate = 0.98; u.pitch = 0.9;
       if (this.music) { const g = this.music.gain; g.setTargetAtTime(0.2, this.ctx.currentTime, 0.1); u.onend = () => g.setTargetAtTime(0.42, this.ctx.currentTime, 0.3); }
-      speechSynthesis.speak(u); } catch (e) { this.babble(text); }
-  }
-  babble(text) {
-    const c = this.ctx; if (!c) return;
-    const words = text.split(/\s+/).filter(w => /\w/.test(w)); if (!words.length) return;
-    const bus = c.createGain(); bus.gain.value = 4; bus.connect(this.master); bus.connect(this.verb);   // narrow formant filters eat most of the energy
-    let t = c.currentTime + 0.05; const t0 = t;
-    const VOW = { a: [730, 1090], e: [530, 1840], i: [390, 1990], o: [570, 840], u: [440, 1020], y: [390, 1990] };
-    words.forEach((w, i) => {
-      const v = (w.toLowerCase().match(/[aeiouy]/g) || ['a']);
-      const syl = Math.min(3, Math.max(1, Math.round(v.length / 1.6)));
-      for (let k = 0; k < syl; k++) {
-        const d = 0.09 + Math.random() * 0.05, [f1, f2] = VOW[v[k % v.length]] || VOW.a;
-        const p = 118 * (1 + 0.12 * Math.sin(i * 1.7 + k)) * (/[?!]/.test(w) && k === syl - 1 ? 1.25 : 1) * (i === words.length - 1 ? 0.85 : 1);
-        const o = c.createOscillator(); o.type = 'sawtooth'; o.frequency.setValueAtTime(p * 1.08, t); o.frequency.linearRampToValueAtTime(p * 0.94, t + d);
-        const env = c.createGain(); env.gain.setValueAtTime(0, t); env.gain.linearRampToValueAtTime(0.22, t + 0.015); env.gain.setTargetAtTime(0, t + d * 0.7, 0.025);
-        o.connect(env);
-        for (const [f, q, g] of [[f1, 6, 1], [f2, 9, 0.5]]) { const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = q;
-          const gg = c.createGain(); gg.gain.value = g; env.connect(bp).connect(gg).connect(bus); }
-        o.start(t); o.stop(t + d + 0.15); t += d + 0.02;
-      }
-      t += /[.,…]$/.test(w) ? 0.22 : 0.05;
-    });
-    if (this.music) { const g = this.music.gain; g.setTargetAtTime(0.28, t0, 0.1); g.setTargetAtTime(0.42, t, 0.3); }
+      speechSynthesis.speak(u); } catch (e) { }
   }
 }
