@@ -436,16 +436,19 @@ export function createFilm2D(canvas, sfx) {
   makeGrain();
   const fx = { shake: 0, flash: 0, sfx };
   function resize() {
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
-    canvas.width = innerWidth * dpr; canvas.height = innerHeight * dpr;
+    const dpr = Math.min(2, window.devicePixelRatio || 1), d = document.documentElement;
+    canvas.width = (d.clientWidth || innerWidth) * dpr; canvas.height = (d.clientHeight || innerHeight) * dpr;
   }
   resize(); addEventListener('resize', resize);
+  if (window.ResizeObserver) new ResizeObserver(resize).observe(document.documentElement);
   return {
     render(t, dt) {
-      const cw = canvas.width, ch = canvas.height, s = Math.max(cw / W, ch / H);
+      // Wide screens fill (cover); narrow ones, like a phone held upright, show the whole 16:9 frame (contain) so nobody gets cut off.
+      const cw = canvas.width, ch = canvas.height, fit = cw / ch < 1.3, s = fit ? Math.min(cw / W, ch / H) : Math.max(cw / W, ch / H);
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.fillStyle = '#1a0f1f'; ctx.fillRect(0, 0, cw, ch);
       ctx.setTransform(s, 0, 0, s, (cw - W * s) / 2, (ch - H * s) / 2);
+      ctx.save(); if (fit) { ctx.beginPath(); ctx.rect(0, 0, W, H); ctx.clip(); }
       if (t < 22) act1(ctx, t, dt, fx);
       else { ctx.save(); ctx.translate(fx.shake * (Math.random() - 0.5), fx.shake * (Math.random() - 0.5)); act2(ctx, t, dt, fx); ctx.restore(); fx.shake *= Math.pow(0.02, dt); }
       // Flash-style act transition: iris wipe into act 2
@@ -457,6 +460,7 @@ export function createFilm2D(canvas, sfx) {
       // vignette
       const v = ctx.createRadialGradient(W / 2, H / 2, H * 0.35, W / 2, H / 2, H * 1.0);
       v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(40,30,20,0.25)'); ctx.fillStyle = v; ctx.fillRect(0, 0, W, H);
+      ctx.restore();
     },
     reset() { fx.landed = fx.hop = fx.roar = fx.clash = false; fx.shake = 0; parts.length = 0; }
   };

@@ -62,15 +62,15 @@ function boot() {
 }
 
 function start(at = 0) {
-  window.focus(); sound.init(); $('#start').style.display = 'none'; $('#end').style.display = 'none';
+  window.focus(); if (isTouch && navigator.userActivation?.isActive) goLandscape(); $('#touch').classList.remove('on'); sound.init(); $('#start').style.display = 'none'; $('#end').style.display = 'none';
   film.reset(); game.reset(); fired = new Set(); T = at; phase = 'film'; ui.hud(false);
   for (const [t] of NARR) if (t < at) fired.add('n' + t);
   const m = [...MUSIC].reverse().find(([t]) => t <= at); if (m) sound.setMusic(m[1]);
   $('#skip').style.display = 'block';
 }
-function skipToFight() { if (phase !== 'film') return; if (T < T_SKIP) { for (const [t] of NARR) if (t < T_SKIP) fired.add('n' + t); T = T_SKIP; sound.setMusic('lift'); speechSynthesis?.cancel(); } }
+function skipToFight() { if (phase !== 'film') return; if (T < T_SKIP) { for (const [t] of NARR) if (t < T_SKIP) fired.add('n' + t); T = T_SKIP; sound.setMusic('lift'); sound.hush(); } }
 function beginFight() {
-  phase = 'fight'; $('#skip').style.display = 'none'; c2d.style.display = 'none';
+  phase = 'fight'; if (isTouch) $('#touch').classList.add('on'); $('#skip').style.display = 'none'; c2d.style.display = 'none';
   game.startFight(); ui.hud(true); setTimeout(() => $('#keys').style.opacity = 0.0, 14000);
 }
 
@@ -124,10 +124,16 @@ $('#fightnow').onclick = () => { start(T_SKIP); };
 $('#retry').onclick = retry;
 $('#replay').onclick = () => { $('#end').style.display = 'none'; start(0); };
 
-// touch controls
+// touch controls (shown once the fight starts)
 const isTouch = matchMedia('(pointer: coarse)').matches || qs.has('touch');
+// On phones, try fullscreen + landscape when play starts (needs the tap's user gesture). Inside an embedded frame this
+// may be refused; the layout still fits either way.
+function goLandscape() {
+  const d = document.documentElement;
+  if (!document.fullscreenElement && d.requestFullscreen) d.requestFullscreen({ navigationUI: 'hide' }).then(() => screen.orientation?.lock?.('landscape')).catch(() => {});
+}
 if (isTouch) {
-  $('#touch').style.display = 'block'; $('#keys').style.display = 'none';
+  $('#keys').style.display = 'none';
   const stick = $('#stick'), knob = $('#knob'); let sid = null;
   const moveStick = e => { const r = stick.getBoundingClientRect(); let x = (e.clientX - r.left - r.width / 2) / (r.width / 2), y = (e.clientY - r.top - r.height / 2) / (r.height / 2);
     const l = Math.hypot(x, y); if (l > 1) { x /= l; y /= l; } knob.style.transform = `translate(${x * 40}px,${y * 40}px)`; if (game) { game.input.mx = x; game.input.my = -y; } };

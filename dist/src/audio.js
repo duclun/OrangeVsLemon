@@ -38,7 +38,7 @@ export class Sound {
     if ('speechSynthesis' in window) { pick(); speechSynthesis.onvoiceschanged = pick; }
   }
 
-  setMute(m) { this.muted = m; if (this.master) this.master.gain.value = m ? 0 : 0.8; if (m && 'speechSynthesis' in window) speechSynthesis.cancel(); }
+  setMute(m) { this.muted = m; if (this.master) this.master.gain.value = m ? 0 : 0.8; if (m) this.hush(); }
 
   // ---- music (v1.5 score, all original) ----
   // Arc: playful A-major marimba (film1) -> warm F#-minor strings (film2) -> swelling timpani and arps (film3)
@@ -218,6 +218,9 @@ export class Sound {
   boomSfx(t, v) { const { o } = this.osc('sine', 110, t, 0.9, v, this.sfxBus); o.frequency.exponentialRampToValueAtTime(28, t + 0.8); }
 
   // ---- narration ----
+  // Spoken with speech synthesis. Where the browser has no speech API (the Claude Android app's viewer) the film plays
+  // with subtitles only.
+  hush() { try { if ('speechSynthesis' in window) speechSynthesis.cancel(); } catch (e) { } }
   say(text) {
     if (this.muted || !('speechSynthesis' in window)) return;
     try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); if (this.voice) u.voice = this.voice; u.rate = 0.98; u.pitch = 0.9;
