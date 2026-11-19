@@ -430,6 +430,9 @@ export function createGame(world, sound, ui) {
     const c = gameCamIdeal();
     camera.position.x = damp(camera.position.x, c.pos.x, 5, rdt); camera.position.y = damp(camera.position.y, c.pos.y, 5, rdt); camera.position.z = damp(camera.position.z, c.pos.z, 5, rdt);
     S.camLook.x = damp(S.camLook.x, c.look.x, 8, rdt); S.camLook.y = damp(S.camLook.y, c.look.y, 8, rdt); S.camLook.z = damp(S.camLook.z, c.look.z, 8, rdt);
+    // NaN guard: a poisoned camera (NaN position/look) draws nothing with no error — reset to a safe pose instead
+    const p = camera.position, l = S.camLook;
+    if (!isFinite(p.x + p.y + p.z) || !isFinite(l.x + l.y + l.z)) { camera.position.set(0, 4, 12); S.camLook.set(0, 1.5, 0); }
     S.shake = Math.max(0, S.shake - rdt * 2);
     const sh = V((Math.random() - 0.5), (Math.random() - 0.5), (Math.random() - 0.5)).multiplyScalar(S.shake);
     camera.position.add(sh); camera.lookAt(S.camLook);

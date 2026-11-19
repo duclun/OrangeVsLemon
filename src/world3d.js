@@ -335,7 +335,7 @@ export class FX {
     for (let i = this.rings.length - 1; i >= 0; i--) { const r = this.rings[i]; r.t += dt;
       if (r.telegraph) { const k = Math.min(1, r.t / r.life); r.mesh.scale.setScalar(r.max * k); r.mesh.material.opacity = 0.3 + 0.4 * Math.abs(Math.sin(r.t * 14)); }
       else { r.r += r.speed * dt; r.mesh.scale.setScalar(r.r); r.mesh.material.opacity = 0.9 * (1 - r.r / r.max); }
-      if ((r.telegraph && r.t > r.life) || (!r.telegraph && r.r > r.max) || r.dead) { this.scene.remove(r.mesh); r.mesh.geometry.dispose(); this.rings.splice(i, 1); } }
+      if ((r.telegraph && r.t > r.life) || (!r.telegraph && r.r > r.max) || r.dead) { this.scene.remove(r.mesh); r.mesh.geometry.dispose(); r.mesh.material.dispose(); this.rings.splice(i, 1); } }
   }
   clearSplats() { for (const s of this.splats) this.scene.remove(s); this.splats.length = 0; }
 }
@@ -348,11 +348,16 @@ export function createWorld(canvas) {
   renderer.setPixelRatio(PERF ? 1 : Math.min(2, devicePixelRatio)); renderer.setSize(innerWidth, innerHeight);
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = PERF ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 0.95;
+  // graphics failure must be VISIBLE, not a silent blank canvas: report context loss + render errors into #err
+  const errBox = document.getElementById('err');
+  const showErr = msg => { if (errBox) { errBox.textContent = msg; errBox.style.display = 'block'; } };
+  canvas.addEventListener('webglcontextlost', e => { e.preventDefault(); showErr('3D graphics stopped (WebGL context lost). Tap this box to reload.'); });
+  canvas.addEventListener('webglcontextrestored', () => { if (errBox) { errBox.textContent = ''; errBox.style.display = 'none'; } });
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0xf3d9a8);
   scene.fog = new THREE.Fog(0xe9c89a, 55, 140);
-  const pmrem = new THREE.PMREMGenerator(renderer);
-  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture; scene.environmentIntensity = 0.45;
+  // phones: skip the PMREM environment entirely — the hemi + sun + rim lights carry the scene, and the env map is pure GPU cost
+  if (!PERF) { const pmrem = new THREE.PMREMGenerator(renderer); scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture; scene.environmentIntensity = 0.45; }
   const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 300);
   camera.position.set(0, 1.6, 9);
   // portrait: vertical FOV 50 collapses horizontal FOV to ~24deg, cropping both fighters — widen it as the screen narrows
@@ -366,7 +371,7 @@ export function createWorld(canvas) {
   // lights: warm sunset key from the window, cool rim, soft fill
   scene.add(new THREE.HemisphereLight(0xfff1dc, 0x7a5a3a, 0.85));
   const sun = new THREE.DirectionalLight(0xffc48a, 2.4); sun.position.set(8, 18, -16); sun.castShadow = true;
-  sun.shadow.mapSize.set(PERF ? 1024 : 2048, PERF ? 1024 : 2048); const sc = sun.shadow.camera; sc.left = sc.bottom = -16; sc.right = sc.top = 16; sc.near = 1; sc.far = 60; sun.shadow.bias = -0.0005; sun.shadow.normalBias = 0.03;
+  sun.shadow.mapSize.set(PERF ? 512 : 2048, PERF ? 512 : 2048); const sc = sun.shadow.camera; sc.left = sc.bottom = -16; sc.right = sc.top = 16; sc.near = 1; sc.far = 60; sun.shadow.bias = -0.0005; sun.shadow.normalBias = 0.03;
   scene.add(sun);
   const rim = new THREE.DirectionalLight(0x9ad7ff, 1.2); rim.position.set(-10, 8, 14); scene.add(rim);
   buildArena(scene);
@@ -379,5 +384,9 @@ export function createWorld(canvas) {
   // v2 perf: on phones skip the composer entirely (half-float fullscreen passes are slow on tile GPUs)
   const direct = PERF;
   if (direct) { renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05; }
-  return { THREE, renderer, scene, camera, fx, composer, perf: PERF, render: () => direct ? renderer.render(scene, camera) : composer.render() };
+  function render() {
+    if (renderer.getContext().isContextLost()) return; // context lost: skip draws until restored
+    if (direct) renderer.render(scene, camera); else composer.render();
+  }
+  return { THREE, renderer, scene, camera, fx, composer, perf: PERF, render, showErr };
 }

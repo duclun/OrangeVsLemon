@@ -68,6 +68,8 @@ function beginFight() {
   game.startFight(); ui.hud(true); setTimeout(() => $('#keys').style.opacity = 0.0, 14000);
 }
 
+function safeRender() { try { world.render(); } catch (e) { if (!window.__renderErr) { window.__renderErr = true; world.showErr?.('Render error: ' + (e && e.message)); } } }
+
 function loop(now) {
   requestAnimationFrame(loop);
   const dt = Math.min(0.05, (now - last) / 1000); last = now; frames++;
@@ -79,12 +81,12 @@ function loop(now) {
     if (T >= 17.4 && T < 21.4) $('#title').style.opacity = 1; else $('#title').style.opacity = 0;
     if (T < T_FADE[1]) { c2d.style.display = 'block'; film.render(Math.min(T, 39.99), dt); c2d.style.opacity = T < T_FADE[0] ? 1 : 1 - (T - T_FADE[0]) / (T_FADE[1] - T_FADE[0]); }
     else c2d.style.display = 'none';
-    if (T >= T_3D) { game.filmUpdate(Math.max(0, T - T_ACT3), T >= T_ACT3 ? dt : 0); world.render(); }
+    if (T >= T_3D) { game.filmUpdate(Math.max(0, T - T_ACT3), T >= T_ACT3 ? dt : 0); safeRender(); }
     if (T >= T_FIGHT - 1.4 && !fired.has('fight')) { fired.add('fight'); ui.hud(true); ui.banner('FIGHT!', 'Knock the belt off El Naranjo'); sound.sfx('bell'); }
     if (T >= T_FIGHT) beginFight();
     return;
   }
-  if (!paused) game.update(dt); world.render();
+  if (!paused) game.update(dt); safeRender();
 }
 
 // ---------- input ----------
@@ -124,6 +126,7 @@ $('#replay').onclick = () => { $('#end').style.display = 'none'; start(0); };
 
 // touch controls
 const isTouch = matchMedia('(pointer: coarse)').matches || qs.has('touch');
+$('#err').addEventListener('click', () => location.reload()); // tap the error box to reload the page
 if (isTouch) {
   $('#keys').style.display = 'none';
   const stick = $('#stick'), knob = $('#knob'); let sid = null;
