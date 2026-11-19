@@ -342,12 +342,16 @@ export class FX {
 
 // ---------- world ----------
 export function createWorld(canvas, opts = {}) {
-  const lite = !!opts.lite; // ?lite=1: strip the GPU-crash suspects (shadows, instanced FX, high-perf hint) to isolate a context-loss trigger
+  const lite = !!opts.lite; // ?lite=1: strip the GPU-crash suspects to isolate a context-loss trigger
+  // granular re-enables for bisecting: ?lite=1&shadows=1, &fx=1, &hp=1
+  const shadows = !lite || !!opts.shadows;
+  const fxOn = !lite || !!opts.fx;
+  const hp = !lite || !!opts.hp;
   // v2 perf: phones (coarse pointer) skip bloom/MSAA, render at 1x DPR — mobile GPUs choke otherwise
   const PERF = matchMedia('(pointer: coarse)').matches;
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: !PERF, powerPreference: lite ? 'default' : 'high-performance' });
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: !PERF, powerPreference: hp ? 'high-performance' : 'default' });
   renderer.setPixelRatio(PERF ? 1 : Math.min(2, devicePixelRatio)); renderer.setSize(innerWidth, innerHeight);
-  renderer.shadowMap.enabled = !lite; renderer.shadowMap.type = PERF ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
+  renderer.shadowMap.enabled = shadows; renderer.shadowMap.type = PERF ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 0.95;
   // graphics failure must be VISIBLE, not a silent blank canvas: report context loss + render errors into #err
   const errBox = document.getElementById('err');
@@ -377,7 +381,7 @@ export function createWorld(canvas, opts = {}) {
   const rim = new THREE.DirectionalLight(0x9ad7ff, 1.2); rim.position.set(-10, 8, 14); scene.add(rim);
   buildArena(scene);
   // lite: no instanced juice/splat/ring FX at all (ring() still returns a dummy object — game.js sets .dead/.hitDone on it)
-  const fx = lite ? { juice() {}, splat() {}, ring() { return {}; }, spark() {}, burst() {}, update() {}, clearSplats() {} } : new FX(scene);
+  const fx = fxOn ? new FX(scene) : { juice() {}, splat() {}, ring() { return {}; }, spark() {}, burst() {}, update() {}, clearSplats() {} };
   const composer = new EffectComposer(renderer);
   composer.addPass(new RenderPass(scene, camera));
   if (!PERF) { const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.18, 0.45, 0.97); composer.addPass(bloom); }

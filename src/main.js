@@ -45,7 +45,7 @@ let world, film, game, T = 0, phase = 'menu', last = performance.now(), fired = 
 const c2d = $('#c2d');
 
 function boot() {
-  world = createWorld($('#c3d'), { lite: qs.has('lite') });
+  world = createWorld($('#c3d'), { lite: qs.has('lite'), shadows: qs.has('shadows'), fx: qs.has('fx'), hp: qs.has('hp') });
   film = createFilm2D(c2d, n => sound.sfx(n));
   game = createGame(world, sound, ui);
   window.GAME = { game, world, sound, get T() { return T; }, set T(v) { T = v; } };
