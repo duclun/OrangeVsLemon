@@ -29,6 +29,10 @@ export class Sound {
 
   setMute(m) { this.muted = m; if (this.master) this.master.gain.value = m ? 0 : 0.8; if (m && 'speechSynthesis' in window) speechSynthesis.cancel(); }
 
+  // pause the music (and narration) — the sequencer runs on its own timer, so pausing the game alone never stopped it
+  suspend() { if (this.ctx) this.ctx.suspend(); if ('speechSynthesis' in window) speechSynthesis.cancel(); }
+  resume() { if (this.ctx) this.ctx.resume(); }
+
   // ---- music ----
   setMusic(mode) { this.mode = mode; }
   schedule() {

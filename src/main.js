@@ -105,9 +105,11 @@ addEventListener('keydown', e => {
 addEventListener('keyup', e => { keys[e.code] = false; syncMove(); });
 // Keys only reach the page while it has focus (inside an embedded frame this matters), so pause and say so when focus leaves.
 let paused = false;
-function setPaused(p) { paused = p && phase === 'fight' && game?.S.mode === 'fight'; $('#focus').style.display = paused ? 'grid' : 'none'; const b = $('#pausebtn'); if (b) b.textContent = paused ? '▶' : '⏸'; }
+function setPaused(p) { paused = p && phase === 'fight' && game?.S.mode === 'fight'; $('#focus').style.display = paused ? 'grid' : 'none'; const b = $('#pausebtn'); if (b) b.textContent = paused ? '▶' : '⏸'; if (paused) sound.suspend(); else sound.resume(); }
 function togglePause() { setPaused(!paused); }
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; syncMove(); setPaused(true); });
+// music runs on its own timer and never stopped when the page lost focus — suspend it when hidden, resume when back (unless paused)
+document.addEventListener('visibilitychange', () => { if (document.hidden) sound.suspend(); else if (!paused) sound.resume(); });
 addEventListener('focus', () => setPaused(false));
 $('#focus').addEventListener('pointerdown', () => { window.focus(); setPaused(false); });
 addEventListener('pointerdown', () => window.focus());
