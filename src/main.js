@@ -17,6 +17,7 @@ const ui = {
   hud(on) { $('#hud').classList.toggle('on', on); },
   end(won, st) {
     const e = $('#end'); e.style.display = 'grid';
+    $('#touch').style.display = 'none'; // hide touch controls behind the end card
     e.querySelector('h2').textContent = won ? 'K.O.!' : 'SQUEEZED!';
     e.querySelector('h2').style.color = won ? 'var(--lemon)' : 'var(--orange)';
     e.querySelector('p').textContent = won ? `Zest is the new champ. ${st.time.toFixed(1)} s, ${st.hits} hits landed, ${Math.round(st.hp)} HP left.` : `El Naranjo keeps the belt… for now. ${st.hits} hits landed.`;
@@ -53,6 +54,7 @@ function boot() {
 
 function start(at = 0) {
   window.focus(); sound.init(); $('#start').style.display = 'none'; $('#end').style.display = 'none';
+  $('#touch').style.display = 'none'; // touch controls only during the fight
   film.reset(); game.reset(); fired = new Set(); T = at; phase = 'film'; ui.hud(false);
   $('#pausebtn').style.display = 'none'; setPaused(false);
   for (const [t] of NARR) if (t < at) fired.add('n' + t);
@@ -62,6 +64,7 @@ function start(at = 0) {
 function skipToFight() { if (phase !== 'film') return; if (T < T_SKIP) { for (const [t] of NARR) if (t < T_SKIP) fired.add('n' + t); T = T_SKIP; sound.setMusic('film3'); speechSynthesis?.cancel(); } }
 function beginFight() {
   phase = 'fight'; $('#skip').style.display = 'none'; $('#pausebtn').style.display = 'block'; c2d.style.display = 'none';
+  if (isTouch) $('#touch').style.display = 'block';
   game.startFight(); ui.hud(true); setTimeout(() => $('#keys').style.opacity = 0.0, 14000);
 }
 
@@ -110,7 +113,7 @@ $('#c3d').addEventListener('mousedown', e => { if (phase !== 'fight') return; ga
 addEventListener('contextmenu', e => e.preventDefault());
 
 function toggleMute() { sound.setMute(!sound.muted); $('#mute').textContent = 'Sound: ' + (sound.muted ? 'off' : 'on'); }
-function retry() { $('#end').style.display = 'none'; ui.hud(true); ui.bossBar(1); ui.playerBar(1); game.restart(); ui.banner('ROUND 1', 'FIGHT!'); sound.sfx('bell'); }
+function retry() { $('#end').style.display = 'none'; if (isTouch) $('#touch').style.display = 'block'; ui.hud(true); ui.bossBar(1); ui.playerBar(1); game.restart(); ui.banner('ROUND 1', 'FIGHT!'); sound.sfx('bell'); }
 $('#mute').onclick = toggleMute;
 $('#pausebtn').onclick = togglePause;
 $('#skip').onclick = skipToFight;
@@ -122,7 +125,7 @@ $('#replay').onclick = () => { $('#end').style.display = 'none'; start(0); };
 // touch controls
 const isTouch = matchMedia('(pointer: coarse)').matches || qs.has('touch');
 if (isTouch) {
-  $('#touch').style.display = 'block'; $('#keys').style.display = 'none';
+  $('#keys').style.display = 'none';
   const stick = $('#stick'), knob = $('#knob'); let sid = null;
   const moveStick = e => { const r = stick.getBoundingClientRect(); let x = (e.clientX - r.left - r.width / 2) / (r.width / 2), y = (e.clientY - r.top - r.height / 2) / (r.height / 2);
     const l = Math.hypot(x, y); if (l > 1) { x /= l; y /= l; } knob.style.transform = `translate(${x * 40}px,${y * 40}px)`; if (game) { game.input.mx = x; game.input.my = -y; } };

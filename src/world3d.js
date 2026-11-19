@@ -355,6 +355,14 @@ export function createWorld(canvas) {
   scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture; scene.environmentIntensity = 0.45;
   const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 300);
   camera.position.set(0, 1.6, 9);
+  // portrait: vertical FOV 50 collapses horizontal FOV to ~24deg, cropping both fighters — widen it as the screen narrows
+  function fitCamera() {
+    const a = innerWidth / innerHeight;
+    camera.aspect = a;
+    camera.fov = a >= 1 ? 50 : Math.min(72, 50 + (1 - a) * 34);
+    camera.updateProjectionMatrix();
+  }
+  fitCamera();
   // lights: warm sunset key from the window, cool rim, soft fill
   scene.add(new THREE.HemisphereLight(0xfff1dc, 0x7a5a3a, 0.85));
   const sun = new THREE.DirectionalLight(0xffc48a, 2.4); sun.position.set(8, 18, -16); sun.castShadow = true;
@@ -367,7 +375,7 @@ export function createWorld(canvas) {
   composer.addPass(new RenderPass(scene, camera));
   if (!PERF) { const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.18, 0.45, 0.97); composer.addPass(bloom); }
   composer.addPass(new OutputPass());
-  addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); });
+  addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight); fitCamera(); });
   // v2 perf: on phones skip the composer entirely (half-float fullscreen passes are slow on tile GPUs)
   const direct = PERF;
   if (direct) { renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05; }

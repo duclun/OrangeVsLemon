@@ -137,10 +137,17 @@ export function createGame(world, sound, ui) {
 
   // ---------- film act 3 ----------
   const postsXZ = Array.from({ length: 8 }, (_, i) => { const a = i / 8 * Math.PI * 2 + Math.PI / 8; return V(Math.cos(a) * (ARENA_R + 0.5), 0, Math.sin(a) * (ARENA_R + 0.5)); });
+  // portrait framing: pull the follow-cam back as the screen narrows so both fighters stay in frame
+  function camFit() { const a = innerWidth / innerHeight; return a >= 1 ? 1 : Math.min(1.5, 1.25 / a); }
   function gameCamIdeal() {
     const P = S.player.pos, B = S.boss.pos, d = V(P.x - B.x, 0, P.z - B.z);
     if (d.length() > 1.6) S.camDir.lerp(d.normalize(), 0.12).normalize();
-    const pos = P.clone().addScaledVector(S.camDir, 7.5).add(V(0, 3.6 + P.y * 0.4, 0));
+    const fit = camFit();
+    const pos = P.clone().addScaledVector(S.camDir, 7.5 * fit).add(V(0, 3.6 * (1 + (fit - 1) * 0.5) + P.y * 0.4, 0));
+    // portrait: step well sideways for a 3/4 view, so the boss isn't hidden directly behind the player
+    // (movement is camDir-relative, so controls stay intuitive)
+    const a = innerWidth / innerHeight;
+    if (a < 1) pos.add(V(-S.camDir.z, 0, S.camDir.x).multiplyScalar((1 - a) * 7.5));
     const look = P.clone().add(V(0, 1.2, 0)).lerp(B.clone().add(V(0, 1.8, 0)), 0.38);
     return { pos, look };
   }
@@ -158,6 +165,9 @@ export function createGame(world, sound, ui) {
     // never let a blended camera pass through Zest: keep it outside a 3.2-unit cylinder around him
     const P = S.player.pos, off = V(cur.pos.x - P.x, 0, cur.pos.z - P.z), d = off.length();
     if (ft > 11 && d < 3.2) { off.multiplyScalar((d > 0.01 ? 1 / d : 0) * 3.2); cur.pos.x = P.x + off.x; cur.pos.z = P.z + off.z; }
+    // portrait: pull the film shots back the same way so the 3D act doesn't crop either
+    const fit = camFit();
+    if (fit > 1) cur.pos = cur.look.clone().add(cur.pos.clone().sub(cur.look).multiplyScalar(fit));
     return cur;
   }
   const events = new Set();

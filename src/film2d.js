@@ -428,7 +428,7 @@ export function createFilm2D(canvas, sfx) {
   resize(); addEventListener('resize', resize);
   return {
     render(t, dt) {
-      const cw = canvas.width, ch = canvas.height, s = Math.max(cw / W, ch / H);
+      const cw = canvas.width, ch = canvas.height, s = Math.min(cw / W, ch / H); // contain: never crop the 16:9 frame on portrait phones
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.fillStyle = '#1a0f1f'; ctx.fillRect(0, 0, cw, ch);
       ctx.setTransform(s, 0, 0, s, (cw - W * s) / 2, (ch - H * s) / 2);
