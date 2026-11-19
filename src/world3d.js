@@ -342,13 +342,15 @@ export class FX {
 
 // ---------- world ----------
 export function createWorld(canvas, opts = {}) {
-  const lite = !!opts.lite; // ?lite=1: strip the GPU-crash suspects to isolate a context-loss trigger
+  // v2 perf: phones (coarse pointer) skip bloom/MSAA, render at 1x DPR — mobile GPUs choke otherwise
+  const PERF = matchMedia('(pointer: coarse)').matches;
+  // phones default to the proven-safe config (no shadows, no instanced FX, default power) — the full
+  // combo crashed the Pixel 10's GPU process in device tests; ?shadows=1 / ?fx=1 / ?hp=1 re-enable one at a time
+  const lite = !!opts.lite || PERF;
   // granular re-enables for bisecting: ?lite=1&shadows=1, &fx=1, &hp=1
   const shadows = !lite || !!opts.shadows;
   const fxOn = !lite || !!opts.fx;
   const hp = !lite || !!opts.hp;
-  // v2 perf: phones (coarse pointer) skip bloom/MSAA, render at 1x DPR — mobile GPUs choke otherwise
-  const PERF = matchMedia('(pointer: coarse)').matches;
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: !PERF, powerPreference: hp ? 'high-performance' : 'default' });
   renderer.setPixelRatio(PERF ? 1 : Math.min(2, devicePixelRatio)); renderer.setSize(innerWidth, innerHeight);
   renderer.shadowMap.enabled = shadows; renderer.shadowMap.type = PERF ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
